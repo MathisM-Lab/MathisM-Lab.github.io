@@ -9,7 +9,7 @@ export const DEFAULT_PARAMS = {
   rappelJour: 1,            // jour du mois à partir duquel le rappel se déclenche
   rappelIntervalHeures: 2,
   onboardingDone: false,
-  nomUtilisateur: 'Matisse',
+  nomUtilisateur: 'Mathis',
   dateNaissance: '2003-10-02',
   dateDebut: '2026-04-01'   // remplacé par le mois courant à la fin de l'onboarding
 };
