@@ -1,6 +1,6 @@
 <script>
   import { app } from '../lib/store.svelte.js';
-  import { setParam, wipeAll } from '../lib/db.js';
+  import { setParam, wipeAll, exportProfil, importProfil } from '../lib/db.js';
   import { moisToLabel, dateDebutToMonthInput, monthInputToDateDebut } from '../lib/date.js';
   import { demanderPermission, notificationsSupportees } from '../lib/notifications.js';
   import Toggle from '../components/Toggle.svelte';
@@ -26,19 +26,36 @@
     await maj('rappelActif', on);
   }
 
-  function exporterCSV() {
-    const nomEnv = (id) => app.enveloppes.find((e) => e.id === id)?.nom ?? '';
-    const lignes = [['Mois', 'Actif', 'Enveloppe', 'Parts', 'Montant']];
-    for (const t of [...app.transactions].sort((a, b) => (a.mois ?? 0) - (b.mois ?? 0))) {
-      lignes.push([t.mois ?? '', t.actif ?? '', nomEnv(t.enveloppe), t.parts ?? '', (t.montant ?? '').toString().replace('.', ',')]);
-    }
-    const csv = lignes.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  let fileInput;
+  let importMsg = $state('');
+  let importErr = $state('');
+
+  async function exporterProfil() {
+    const payload = await exportProfil();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'monportefeuille-transactions.csv';
+    a.href = url; a.download = `monportefeuille-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function fichierChoisi(e) {
+    importMsg = ''; importErr = '';
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = ''; // autorise à re-choisir le même fichier
+    if (!file) return;
+    // Restaurer remplace les données actuelles : on confirme si le profil n'est pas vide.
+    const nonVide = app.transactions.length > 0 || app.enveloppes.length > 0;
+    if (nonVide && !confirm('Importer remplacera tes données actuelles. Continuer ?')) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      await importProfil(payload);
+      await app.reload();
+      importMsg = 'Profil importé : tes données ont été restaurées.';
+    } catch (err) {
+      importErr = err?.message ?? String(err);
+    }
   }
 
   // Reset sécurisé : il faut recopier exactement une chaîne fixe de 10 caractères
@@ -127,12 +144,19 @@
     {/if}
   </section>
 
-  <!-- Export -->
+  <!-- Sauvegarde -->
   <section class="card">
-    <div class="eyebrow" style="margin-bottom:12px">Données</div>
-    <button class="btn btn-secondary btn-block" onclick={exporterCSV} disabled={app.transactions.length === 0}>
-      <Icon name="download" size={17} /> Exporter mes transactions (CSV)
+    <div class="eyebrow" style="margin-bottom:12px">Sauvegarde</div>
+    <button class="btn btn-secondary btn-block" onclick={exporterProfil}>
+      <Icon name="download" size={17} /> Exporter tout mon profil
     </button>
+    <button class="btn btn-secondary btn-block" style="margin-top:10px" onclick={() => fileInput.click()}>
+      <Icon name="upload" size={17} /> Importer un profil
+    </button>
+    <input type="file" accept="application/json,.json" bind:this={fileInput} onchange={fichierChoisi} hidden />
+    {#if importMsg}<p class="ok-note">{importMsg}</p>{/if}
+    {#if importErr}<p class="neg" style="margin:10px 0 0;font-size:13px">{importErr}</p>{/if}
+    <p class="text-3" style="font-size:12px;margin:10px 0 0">Le fichier contient toutes tes saisies (paramètres, enveloppes, transactions). Garde-le précieusement : c'est ta sauvegarde.</p>
   </section>
 
   <!-- Zone danger -->
@@ -164,5 +188,6 @@
     color: var(--warn); font-size: 12.5px; margin: 12px 0 0;
   }
   .link { color: var(--accent); font-weight: 600; text-decoration: underline; }
+  .ok-note { color: #3FB950; font-size: 13px; margin: 10px 0 0; }
   section { scroll-margin-top: 20px; }
 </style>

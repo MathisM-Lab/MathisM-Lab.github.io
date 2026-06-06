@@ -142,6 +142,49 @@ export async function setProjectionBatch(rows) {
   await tx.done;
 }
 
+// === Export / Import du profil ===
+// Stores contenant les données SAISIES par l'utilisateur (à sauvegarder).
+// Les caches (prixCache, prixHistorique) en sont volontairement exclus : ils se
+// reconstruisent seuls via le réseau. Pour ajouter une future fonctionnalité,
+// il suffira d'ajouter son store ici : les anciens fichiers resteront lisibles.
+export const STORES_PROFIL = ['parametres', 'enveloppes', 'transactions'];
+export const PROFIL_SCHEMA = 1;
+
+export async function exportProfil() {
+  const db = await getDB();
+  const data = {};
+  for (const s of STORES_PROFIL) data[s] = await db.getAll(s);
+  return {
+    app: 'MonPortefeuille',
+    type: 'profil',
+    schema: PROFIL_SCHEMA,
+    exportedAt: new Date().toISOString(),
+    data
+  };
+}
+
+// Restaure un profil. Ne touche QUE les stores connus présents dans le fichier :
+// - un store absent du fichier est laissé tel quel (vieux fichier -> donnée
+//   manquante simplement non importée) ;
+// - un store inconnu dans le fichier est ignoré (fichier d'une version récente).
+export async function importProfil(payload) {
+  const data = payload?.data;
+  if (!data || typeof data !== 'object') throw new Error('Fichier invalide.');
+  if (payload.app && payload.app !== 'MonPortefeuille') {
+    throw new Error('Ce fichier ne provient pas de MonPortefeuille.');
+  }
+  const db = await getDB();
+  const stores = STORES_PROFIL.filter((s) => Array.isArray(data[s]));
+  if (stores.length === 0) throw new Error('Aucune donnée reconnue dans le fichier.');
+  const tx = db.transaction(stores, 'readwrite');
+  for (const s of stores) {
+    const store = tx.objectStore(s);
+    await store.clear();
+    for (const row of data[s]) await store.put(row);
+  }
+  await tx.done;
+}
+
 // === Reset complet (debug / paramètres) ===
 export async function wipeAll() {
   const db = await getDB();
