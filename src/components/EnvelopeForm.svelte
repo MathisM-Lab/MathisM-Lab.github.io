@@ -8,7 +8,7 @@
 
   let { enveloppe = null, onClose } = $props();
 
-  const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', paliers: [], actifs: [] };
+  const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', paliers: [], actifs: [] };
   // En édition, `enveloppe` est un proxy réactif Svelte -> $state.snapshot (structuredClone planterait).
   const source = untrack(() => enveloppe);
   let form = $state(source ? $state.snapshot(source) : structuredClone(vide));
@@ -91,6 +91,14 @@
            placeholder={gereActifs ? 'Ex. 7' : 'Ex. 2,4'} />
     <p class="text-3" style="font-size:12px;margin:6px 0 0">Sert uniquement à la courbe « Plan ». Laisse vide pour la valeur par défaut du type.</p>
   </div>
+
+  {#if gereActifs}
+    <div class="field">
+      <label class="label" for="ef-frais">Frais de courtage (%)</label>
+      <input class="input" id="ef-frais" type="number" step="0.01" min="0" bind:value={form.fraisPct} placeholder="Ex. 0,3" />
+      <p class="text-3" style="font-size:12px;margin:6px 0 0">Ajoutés automatiquement au montant saisi lors d'un achat (et retranchés à une vente).</p>
+    </div>
+  {/if}
 
   {#if gereActifs}
     <div class="between" style="margin:6px 0 10px">
