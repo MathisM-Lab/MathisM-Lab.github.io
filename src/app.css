@@ -1,0 +1,366 @@
+/* ============================================================
+   MonPortefeuille — design system
+   Direction : sombre neutre, hairlines plutôt qu'ombres,
+   un seul accent, typographie financière à chiffres tabulaires.
+   ============================================================ */
+
+:root {
+  /* Surfaces — neutre profond légèrement froid, élévations subtiles */
+  --bg: #0C0F14;
+  --surface: #12161D;
+  --surface-2: #181D26;
+  --surface-3: #20262F;
+
+  /* Hairlines */
+  --line: #1F2630;
+  --line-strong: #2A323D;
+
+  /* Texte */
+  --text: #EAEEF4;
+  --text-2: #9AA4B2;
+  --text-3: #5C6675;
+
+  /* Accent unique */
+  --accent: #3D7DFF;
+  --accent-press: #2E6BEC;
+  --accent-soft: rgba(61, 125, 255, 0.12);
+  --accent-line: rgba(61, 125, 255, 0.30);
+
+  /* Sémantique finance */
+  --pos: #16C784;
+  --pos-soft: rgba(22, 199, 132, 0.12);
+  --neg: #EA3943;
+  --neg-soft: rgba(234, 57, 67, 0.12);
+  --warn: #F0A92B;
+  --warn-soft: rgba(240, 169, 43, 0.12);
+
+  /* Rayons */
+  --r-card: 16px;
+  --r-md: 12px;
+  --r-sm: 9px;
+  --r-pill: 999px;
+
+  /* Espacement */
+  --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+  --s5: 20px; --s6: 24px; --s7: 32px; --s8: 40px;
+
+  /* Élévation (rare, douce) */
+  --shadow-sheet: 0 -8px 40px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.40);
+
+  /* Navigation */
+  --nav-h: 60px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  --safe-t: env(safe-area-inset-top, 0px);
+
+  --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  font-family: var(--font);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Pas de scrollbar visible (le défilement reste actif) */
+html { scrollbar-width: none; -ms-overflow-style: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+body {
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Chiffres tabulaires : essentiel en finance pour l'alignement */
+.tnum, .num, .amount {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'cv01' 1;
+}
+
+/* ---- Typographie ---- */
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.02em; }
+h1 { font-size: 26px; line-height: 1.15; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+h4 { font-size: 14px; }
+
+.display {
+  font-size: 38px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+/* Label de section — petit, espacé, discret */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.text-2 { color: var(--text-2); }
+.text-3 { color: var(--text-3); }
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+
+/* ---- Cartes ---- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: var(--s5);
+}
+.card-tight { padding: var(--s4); }
+.card-flush { padding: 0; overflow: hidden; }
+
+/* ---- Boutons ---- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  padding: 0 18px;
+  height: 46px;
+  border-radius: var(--r-md);
+  font-weight: 600;
+  font-size: 15px;
+  transition: background 0.15s, opacity 0.15s, transform 0.04s;
+  user-select: none;
+}
+.btn:active { transform: scale(0.985); }
+.btn-block { width: 100%; }
+.btn-lg { height: 52px; font-size: 16px; }
+
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:active { background: var(--accent-press); }
+.btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.btn-secondary {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line-strong);
+}
+.btn-ghost { color: var(--text-2); }
+.btn-ghost:active { color: var(--text); }
+
+.btn-danger {
+  background: var(--neg-soft);
+  color: var(--neg);
+  border: 1px solid rgba(234, 57, 67, 0.25);
+}
+
+/* Icône-bouton carré */
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--r-sm);
+  color: var(--text-2);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  transition: color 0.15s, border-color 0.15s;
+}
+.icon-btn:active { color: var(--text); border-color: var(--line-strong); }
+
+/* ---- Champs ---- */
+.field { margin-bottom: var(--s4); }
+.label {
+  display: block;
+  margin-bottom: var(--s2);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+.input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  font-variant-numeric: tabular-nums;
+}
+.input:focus { border-color: var(--accent); background: var(--surface); }
+textarea.input { height: auto; padding: 12px 14px; resize: vertical; }
+select.input { appearance: none; }
+
+/* Pas de flèches (spinners) sur les champs nombre : saisie au clavier uniquement */
+input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Gros champ montant (rééquilibrage) */
+.input-amount {
+  height: 64px;
+  font-size: 30px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: -0.02em;
+}
+
+/* ---- Pills / onglets ---- */
+.seg {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  padding: 3px;
+  gap: 2px;
+}
+.seg button {
+  padding: 7px 14px;
+  border-radius: var(--r-pill);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.seg button.on {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* Badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: var(--r-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-pos { background: var(--pos-soft); color: var(--pos); }
+.badge-warn { background: var(--warn-soft); color: var(--warn); }
+.badge-neg { background: var(--neg-soft); color: var(--neg); }
+.badge-neutral { background: var(--surface-2); color: var(--text-2); border: 1px solid var(--line); }
+
+.dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Pastille de variation chiffrée */
+.delta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* Lignes de données (clé/valeur) avec hairline */
+.rows { display: flex; flex-direction: column; }
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
+  padding: 13px 0;
+}
+.row + .row { border-top: 1px solid var(--line); }
+.row .k { color: var(--text-2); font-size: 14px; }
+.row .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+/* ---- Layout écran ---- */
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: calc(var(--safe-t) + var(--s5)) var(--s4)
+           calc(var(--nav-h) + var(--safe-b) + var(--s6));
+  max-width: 560px;
+  width: 100%;
+  margin: 0 auto;
+}
+.screen-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s3);
+  margin-bottom: var(--s1);
+}
+.screen-head .sub { color: var(--text-3); font-size: 13px; margin-top: 2px; }
+
+.stack { display: flex; flex-direction: column; gap: var(--s4); }
+.stack-sm { display: flex; flex-direction: column; gap: var(--s2); }
+.between { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); }
+.cluster { display: flex; align-items: center; gap: var(--s2); }
+.grow { flex: 1; }
+
+/* Scroll horizontal sans barre */
+.hscroll {
+  display: flex;
+  gap: var(--s2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.hscroll::-webkit-scrollbar { display: none; }
+
+/* États vides */
+.empty {
+  text-align: center;
+  color: var(--text-3);
+  padding: var(--s7) var(--s4);
+  font-size: 14px;
+}
+
+/* Spinner */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Divider */
+.hr { height: 1px; background: var(--line); border: 0; margin: 0; }
