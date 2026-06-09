@@ -73,7 +73,7 @@
       <span class="badge badge-pos"><Icon name="check-circle" size={15} /> Mois validé</span>
       <span class="status-sub">{moisToLabel(mc, app.params.dateDebut)} · tout est investi</span>
     {:else}
-      <span class="badge badge-warn"><Icon name="bell" size={15} /> Investissement en attente</span>
+      <span class="badge badge-warn"><Icon name="bell" size={15} /> En attente</span>
       <span class="status-sub">{manquantes.length ? manquantes.join(' · ') : moisToLabel(mc, app.params.dateDebut)}</span>
     {/if}
     <Icon name="chevron-right" size={18} />
