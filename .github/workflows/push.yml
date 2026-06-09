@@ -1,0 +1,22 @@
+name: Rappel mensuel (push)
+
+on:
+  schedule:
+    - cron: '0 8 1 * *'   # le 1er de chaque mois à 08:00 UTC (~9-10h en France)
+  workflow_dispatch:        # permet de lancer un envoi manuel pour tester
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install web-push@^3 --no-save
+      - run: node scripts/send-push.mjs
+        env:
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+          VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}

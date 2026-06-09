@@ -1,5 +1,7 @@
 <script>
+  import { onMount } from 'svelte';
   import { app } from '../lib/store.svelte.js';
+  import { activerPush, pushSupporte, abonnementActuel } from '../lib/push.js';
   import { setParam, wipeAll, exportProfil, importProfil } from '../lib/db.js';
   import { moisToLabel, dateDebutToMonthInput, monthInputToDateDebut } from '../lib/date.js';
   import { demanderPermission, notificationsSupportees, testerNotification } from '../lib/notifications.js';
@@ -24,6 +26,26 @@
       permState = p;
     }
     await maj('rappelActif', on);
+  }
+
+  // --- Notifications push (app fermée) ---
+  let pushJson = $state('');
+  let pushMsg = $state('');
+  let pushAbonne = $state(false);
+  onMount(async () => { if (pushSupporte()) pushAbonne = !!(await abonnementActuel()); });
+  async function activerNotifsPush() {
+    pushMsg = ''; pushJson = '';
+    try {
+      pushJson = await activerPush();
+      pushAbonne = true;
+      pushMsg = 'Abonnement créé. Copie le texte ci-dessous dans le secret GitHub PUSH_SUBSCRIPTION.';
+    } catch (e) {
+      pushMsg = e?.message ?? String(e);
+    }
+  }
+  async function copierPush() {
+    try { await navigator.clipboard.writeText(pushJson); pushMsg = 'Copié.'; }
+    catch { pushMsg = 'Copie auto impossible — sélectionne le texte et copie-le à la main.'; }
   }
 
   let testMsg = $state('');
@@ -155,7 +177,27 @@
       <Icon name="bell" size={16} /> Tester la notification
     </button>
     {#if testMsg}<p class="text-3" style="font-size:12.5px;margin:10px 0 0">{testMsg}</p>{/if}
-    <p class="text-3" style="font-size:12px;margin:10px 0 0">Les rappels n'arrivent que lorsque l'app est ouverte ou au moment où tu l'ouvres : une PWA ne peut pas notifier quand elle est fermée. Pour un rappel garanti, crée une alarme mensuelle dans l'app Horloge/Agenda de ton téléphone.</p>
+    <p class="text-3" style="font-size:12px;margin:10px 0 0">Ces rappels n'arrivent que lorsque l'app est ouverte ou au moment où tu l'ouvres. Pour un rappel même app fermée, utilise la section ci-dessous.</p>
+  </section>
+
+  <!-- Notifications push (app fermée) -->
+  <section class="card">
+    <div class="eyebrow" style="margin-bottom:12px">Rappel mensuel (app fermée)</div>
+    {#if !pushSupporte()}
+      <p class="text-3" style="font-size:13px;margin:0">Ton navigateur ne supporte pas les notifications push.</p>
+    {:else}
+      <p class="text-3" style="font-size:12.5px;margin:0 0 12px">Un rappel automatique le 1er de chaque mois, même app fermée. Active l'abonnement, puis colle le texte obtenu dans le secret GitHub <strong>PUSH_SUBSCRIPTION</strong> (configuration en une fois).</p>
+      <button class="btn btn-secondary btn-block" onclick={activerNotifsPush}>
+        <Icon name="bell" size={16} /> {pushAbonne ? 'Régénérer mon abonnement' : 'Activer (app fermée)'}
+      </button>
+      {#if pushJson}
+        <textarea class="input" readonly rows="4" value={pushJson}
+                  style="margin-top:10px;font-size:11px;font-family:monospace;height:auto;resize:vertical"
+                  onclick={(e) => e.currentTarget.select()}></textarea>
+        <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick={copierPush}>Copier l'abonnement</button>
+      {/if}
+      {#if pushMsg}<p class="text-3" style="font-size:12.5px;margin:10px 0 0">{pushMsg}</p>{/if}
+    {/if}
   </section>
 
   <!-- Sauvegarde -->

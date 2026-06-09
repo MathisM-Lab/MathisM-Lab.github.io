@@ -38,6 +38,10 @@ export default defineConfig({
           }
         ]
       },
+      workbox: {
+        // Ajoute notre gestionnaire de push au service worker généré.
+        importScripts: ['push-sw.js']
+      },
       devOptions: {
         enabled: false
       }
