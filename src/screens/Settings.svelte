@@ -2,7 +2,7 @@
   import { app } from '../lib/store.svelte.js';
   import { setParam, wipeAll, exportProfil, importProfil } from '../lib/db.js';
   import { moisToLabel, dateDebutToMonthInput, monthInputToDateDebut } from '../lib/date.js';
-  import { demanderPermission, notificationsSupportees } from '../lib/notifications.js';
+  import { demanderPermission, notificationsSupportees, testerNotification } from '../lib/notifications.js';
   import Toggle from '../components/Toggle.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -24,6 +24,14 @@
       permState = p;
     }
     await maj('rappelActif', on);
+  }
+
+  let testMsg = $state('');
+  async function tester() {
+    testMsg = '';
+    const r = await testerNotification();
+    permState = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+    testMsg = r === 'ok' ? 'Notification envoyée. Vérifie ton volet de notifications.' : r;
   }
 
   let fileInput;
@@ -142,6 +150,12 @@
         </p>
       {/if}
     {/if}
+
+    <button class="btn btn-secondary btn-block" style="margin-top:14px" onclick={tester}>
+      <Icon name="bell" size={16} /> Tester la notification
+    </button>
+    {#if testMsg}<p class="text-3" style="font-size:12.5px;margin:10px 0 0">{testMsg}</p>{/if}
+    <p class="text-3" style="font-size:12px;margin:10px 0 0">Les rappels n'arrivent que lorsque l'app est ouverte ou au moment où tu l'ouvres : une PWA ne peut pas notifier quand elle est fermée. Pour un rappel garanti, crée une alarme mensuelle dans l'app Horloge/Agenda de ton téléphone.</p>
   </section>
 
   <!-- Sauvegarde -->

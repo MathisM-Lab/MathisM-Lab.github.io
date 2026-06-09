@@ -49,6 +49,18 @@ async function afficher(titre, corps) {
   }
 }
 
+// Déclenche une notification de test immédiate (ignore jour/heure/anti-spam).
+// Renvoie un statut lisible pour diagnostiquer sur l'appareil.
+export async function testerNotification() {
+  if (!notificationsSupportees()) return 'Notifications non supportées par ce navigateur.';
+  const perm = Notification.permission === 'granted'
+    ? 'granted'
+    : await Notification.requestPermission();
+  if (perm !== 'granted') return 'Autorisation refusée (à débloquer dans les réglages du navigateur).';
+  await afficher('Test MonPortefeuille', 'Si tu vois ce message, les notifications fonctionnent.');
+  return 'ok';
+}
+
 function heureRappelAtteinte(rappelHeure, now = new Date()) {
   const [h, m] = (rappelHeure ?? '09:00').split(':').map(Number);
   const seuil = new Date(now);
