@@ -144,7 +144,7 @@
   .prow + .prow { border-top: 1px solid var(--line); }
   .prow-nom { font-weight: 600; font-size: 14px; }
   .prow-meta { font-size: 11.5px; margin-top: 2px; }
-  .prow-prix { font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .prow-prix { margin-left: auto; padding-left: 12px; font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; }
   .mini { width: 92px; height: 40px; text-align: right; padding: 0 10px; }
 
   .res-nom { font-weight: 600; font-size: 15px; }
