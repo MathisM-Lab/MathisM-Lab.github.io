@@ -279,7 +279,7 @@
   .palier { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
   .palier-lbl { font-size: 12px; flex-shrink: 0; }
   .palier-mois { flex: 1; height: 40px; padding: 0 10px; min-width: 0; font-size: 13px; }
-  .palier-montant { width: 62px; height: 40px; text-align: right; padding: 0 10px; flex-shrink: 0; }
+  .palier-montant { width: 55px; height: 40px; text-align: right; padding: 0 10px; flex-shrink: 0; font-size: 13px; }
   .palier-del { width: 34px; height: 34px; border: 0; background: transparent; color: var(--text-3); flex-shrink: 0; }
   .palier-add {
     display: inline-flex; align-items: center; gap: 6px;
