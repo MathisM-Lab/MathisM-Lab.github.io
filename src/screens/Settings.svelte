@@ -211,6 +211,8 @@
       </div>
     {/if}
   </section>
+
+  <p class="build">Version {__BUILD_ID__}</p>
 </div>
 
 <style>
@@ -223,4 +225,5 @@
   .link { color: var(--accent); font-weight: 600; text-decoration: underline; }
   .ok-note { color: #3FB950; font-size: 13px; margin: 10px 0 0; }
   section { scroll-margin-top: 20px; }
+  .build { text-align: center; color: var(--text-3); font-size: 11.5px; margin: 4px 0 0; }
 </style>
