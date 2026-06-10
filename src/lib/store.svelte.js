@@ -36,10 +36,18 @@ function createAppState() {
   async function migrer(enveloppes, transactions) {
     const db = await getDB();
     for (const env of enveloppes) {
-      if (!Array.isArray(env.actifs) || env.actifs.length === 0) continue;
       let changed = false;
-      for (const a of env.actifs) {
-        if (!a.id) { a.id = crypto.randomUUID(); changed = true; }
+      if (Array.isArray(env.actifs)) {
+        for (const a of env.actifs) {
+          if (!a.id) { a.id = crypto.randomUUID(); changed = true; }
+        }
+      }
+      // Id stable pour chaque palier (sinon l'UI indexe par position et les
+      // valeurs se désynchronisent lors d'un tri/ajout/suppression).
+      if (Array.isArray(env.paliers)) {
+        for (const p of env.paliers) {
+          if (!p.id) { p.id = crypto.randomUUID(); changed = true; }
+        }
       }
       if (changed) await db.put('enveloppes', env);
     }

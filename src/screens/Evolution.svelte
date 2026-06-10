@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct, eurosCompact } from '../lib/format.js';
-  import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput } from '../lib/date.js';
+  import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
   import { projeteAuMois, evenementsProjection, mvtPrevuAuMois } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
   import { saveEnveloppe } from '../lib/db.js';
@@ -17,24 +17,33 @@
     return Array.isArray(e.paliers) ? e.paliers : [];
   }
   async function persistPaliers(env, paliers) {
+    // Tri chronologique pour l'affichage. L'each est indexé par `id` (stable),
+    // donc réordonner ne désynchronise plus les champs de saisie.
     paliers.sort((a, b) => (a.depuis < b.depuis ? -1 : a.depuis > b.depuis ? 1 : 0));
     await saveEnveloppe({ ...$state.snapshot(env), paliers });
     await app.reload();
   }
   async function ajouterPalier(env) {
     const paliers = paliersEnv(env).map((p) => ({ ...p }));
-    paliers.push({ depuis: dateDebutToMonthInput(app.params.dateDebut), montant: 0 });
+    // Nouveau palier au mois suivant le dernier (donc en bas, chronologiquement).
+    let depuis = dateDebutToMonthInput(app.params.dateDebut);
+    if (paliers.length) {
+      const dernier = paliers.reduce((max, p) => (p.depuis > max ? p.depuis : max), paliers[0].depuis);
+      depuis = moisToMonthInput(monthInputToMois(dernier, app.params.dateDebut) + 1, app.params.dateDebut);
+    }
+    paliers.push({ id: crypto.randomUUID(), depuis, montant: 0 });
     await persistPaliers(env, paliers);
   }
-  async function majPalier(env, index, champ, valeur) {
+  async function majPalier(env, id, champ, valeur) {
     const paliers = paliersEnv(env).map((p) => ({ ...p }));
-    if (!paliers[index]) return;
-    if (champ === 'montant') paliers[index].montant = Number(String(valeur).replace(',', '.')) || 0;
-    else paliers[index].depuis = valeur;
+    const cible = paliers.find((p) => p.id === id);
+    if (!cible) return;
+    if (champ === 'montant') cible.montant = Number(String(valeur).replace(',', '.')) || 0;
+    else cible.depuis = valeur;
     await persistPaliers(env, paliers);
   }
-  async function retirerPalier(env, index) {
-    const paliers = paliersEnv(env).filter((_, i) => i !== index);
+  async function retirerPalier(env, id) {
+    const paliers = paliersEnv(env).filter((p) => p.id !== id);
     await persistPaliers(env, paliers);
   }
   // Versement réellement prévu ce mois-ci (somme des paliers actifs), pour info.
@@ -204,14 +213,14 @@
       {#each app.enveloppes as e (e.id)}
         <div class="plan-env">
           <div class="plan-env-head"><span class="dot" style="background:{e.couleur}"></span>{e.nom}</div>
-          {#each paliersEnv(e) as p, i (i)}
+          {#each paliersEnv(e) as p (p.id)}
             <div class="palier">
               <span class="text-3 palier-lbl">dès</span>
               <input class="input palier-mois" type="month" value={p.depuis}
-                     onchange={(ev) => majPalier(e, i, 'depuis', ev.currentTarget.value)} />
+                     onchange={(ev) => majPalier(e, p.id, 'depuis', ev.currentTarget.value)} />
               <input class="input palier-montant" type="number" step="10" min="0" value={p.montant}
-                     onchange={(ev) => majPalier(e, i, 'montant', ev.currentTarget.value)} /><span class="text-3">€</span>
-              <button class="icon-btn palier-del" onclick={() => retirerPalier(e, i)} aria-label="Retirer le palier">
+                     onchange={(ev) => majPalier(e, p.id, 'montant', ev.currentTarget.value)} /><span class="text-3">€</span>
+              <button class="icon-btn palier-del" onclick={() => retirerPalier(e, p.id)} aria-label="Retirer le palier">
                 <Icon name="trash" size={15} />
               </button>
             </div>
