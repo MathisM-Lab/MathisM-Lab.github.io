@@ -66,14 +66,22 @@
     app.enveloppes.reduce((s, e) => s + mvtPrevuAuMois(e, app.moisCourant, app.params.dateDebut), 0)
   );
 
-  const PERIODES = [
-    { id: '3m', label: '3 mois', horizon: 3 },
-    { id: '1an', label: '1 an', horizon: 12 },
-    { id: '5ans', label: '5 ans', horizon: 60 },
-    { id: '20ans', label: '20 ans', horizon: 240 }
-  ];
-  let periode = $state('5ans');
-  let horizon = $derived(PERIODES.find((p) => p.id === periode).horizon);
+  // Horizon du graphique : curseur libre de 3 mois à 40 ans (480 mois).
+  // La position est mémorisée d'une session à l'autre (localStorage).
+  const HORIZON_MIN = 3, HORIZON_MAX = 480;
+  function chargerHorizon() {
+    const v = Number(localStorage.getItem('evo-horizon'));
+    return Number.isFinite(v) && v >= HORIZON_MIN && v <= HORIZON_MAX ? v : 60;
+  }
+  let horizon = $state(chargerHorizon());
+  $effect(() => { localStorage.setItem('evo-horizon', String(horizon)); });
+
+  function labelHorizon(m) {
+    if (m < 12) return `${m} mois`;
+    const ans = Math.floor(m / 12), mois = m % 12;
+    const a = `${ans} an${ans > 1 ? 's' : ''}`;
+    return mois ? `${a} ${mois} mois` : a;
+  }
 
   let serie = $derived(app.projection);
   let mc = $derived(app.moisCourant);
@@ -198,12 +206,10 @@
         <button class="chip" class:on={vueKey === v.key} onclick={() => (vueKey = v.key)}>{v.label}</button>
       {/each}
     </div>
-    <div class="between" style="margin-bottom:12px">
-      <div class="seg">
-        {#each PERIODES as p}
-          <button class:on={periode === p.id} onclick={() => (periode = p.id)}>{p.label}</button>
-        {/each}
-      </div>
+    <div class="horizon" style="margin-bottom:12px">
+      <input class="horizon-range" type="range" min={HORIZON_MIN} max={HORIZON_MAX} step="1"
+             bind:value={horizon} aria-label="Horizon du graphique" />
+      <span class="horizon-val">{labelHorizon(horizon)}</span>
     </div>
     <LineChart {series} {markers} height={240}
       formatX={(m) => moisToLabelCourt(m, app.params.dateDebut)} formatY={eurosCompact} />
@@ -272,6 +278,13 @@
     color: var(--text-2); font-weight: 600; font-size: 13px;
   }
   .chip.on { color: var(--text); border-color: var(--line-strong); background: var(--surface-3); }
+
+  .horizon { display: flex; align-items: center; gap: 12px; }
+  .horizon-range { flex: 1; min-width: 0; accent-color: var(--accent); height: 24px; }
+  .horizon-val {
+    flex-shrink: 0; min-width: 84px; text-align: right;
+    font-weight: 650; font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  }
 
   .plan-env { padding: 12px 0; }
   .plan-env + .plan-env { border-top: 1px solid var(--line); }

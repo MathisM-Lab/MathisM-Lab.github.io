@@ -136,7 +136,8 @@ function createAppState() {
         enveloppes,
         rendementMensuel: params.rendementMensuel ?? 0.0056,
         dateNaissance: params.dateNaissance,
-        dateDebut: params.dateDebut
+        dateDebut: params.dateDebut,
+        maxMois: 480
       });
     },
     get moisCourantValide() {
