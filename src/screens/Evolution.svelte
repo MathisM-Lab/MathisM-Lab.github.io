@@ -280,7 +280,25 @@
   .chip.on { color: var(--text); border-color: var(--line-strong); background: var(--surface-3); }
 
   .horizon { display: flex; align-items: center; gap: 12px; }
-  .horizon-range { flex: 1; min-width: 0; accent-color: var(--accent); height: 24px; }
+  .horizon-range {
+    flex: 1; min-width: 0; accent-color: var(--accent); height: 24px;
+    -webkit-appearance: none; appearance: none; background: transparent;
+    border: 0; outline: 0;
+  }
+  .horizon-range:focus { outline: 0; }
+  .horizon-range::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px; border: 0; background: var(--line);
+  }
+  .horizon-range::-moz-range-track {
+    height: 4px; border-radius: 2px; border: 0; background: var(--line);
+  }
+  .horizon-range::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none; margin-top: -7px;
+    width: 18px; height: 18px; border-radius: 50%; border: 0; background: var(--accent);
+  }
+  .horizon-range::-moz-range-thumb {
+    width: 18px; height: 18px; border-radius: 50%; border: 0; background: var(--accent);
+  }
   .horizon-val {
     flex-shrink: 0; min-width: 84px; text-align: right;
     font-weight: 650; font-size: 14px; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
