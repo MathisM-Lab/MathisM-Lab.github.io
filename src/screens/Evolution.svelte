@@ -206,7 +206,7 @@
           <div class="plan-env-head"><span class="dot" style="background:{e.couleur}"></span>{e.nom}</div>
           {#each paliersEnv(e) as p, i (i)}
             <div class="palier">
-              <span class="text-3" style="font-size:12px">à partir de</span>
+              <span class="text-3 palier-lbl">dès</span>
               <input class="input palier-mois" type="month" value={p.depuis}
                      onchange={(ev) => majPalier(e, i, 'depuis', ev.currentTarget.value)} />
               <input class="input palier-montant" type="number" step="10" min="0" value={p.montant}
@@ -253,8 +253,9 @@
   .plan-env + .plan-env { border-top: 1px solid var(--line); }
   .plan-env-head { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; margin-bottom: 10px; }
   .palier { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .palier-lbl { font-size: 12px; flex-shrink: 0; }
   .palier-mois { flex: 1; height: 40px; padding: 0 10px; min-width: 0; }
-  .palier-montant { width: 88px; height: 40px; text-align: right; padding: 0 10px; }
+  .palier-montant { width: 78px; height: 40px; text-align: right; padding: 0 10px; flex-shrink: 0; }
   .palier-del { width: 34px; height: 34px; border: 0; background: transparent; color: var(--text-3); flex-shrink: 0; }
   .palier-add {
     display: inline-flex; align-items: center; gap: 6px;
