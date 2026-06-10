@@ -4,7 +4,7 @@
   import { activerPush, pushSupporte, abonnementActuel } from '../lib/push.js';
   import { setParam, wipeAll, exportProfil, importProfil } from '../lib/db.js';
   import { moisToLabel, dateDebutToMonthInput, monthInputToDateDebut } from '../lib/date.js';
-  import { demanderPermission, notificationsSupportees, testerNotification } from '../lib/notifications.js';
+  import { demanderPermission, notificationsSupportees } from '../lib/notifications.js';
   import Toggle from '../components/Toggle.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -46,14 +46,6 @@
   async function copierPush() {
     try { await navigator.clipboard.writeText(pushJson); pushMsg = 'Copié.'; }
     catch { pushMsg = 'Copie auto impossible — sélectionne le texte et copie-le à la main.'; }
-  }
-
-  let testMsg = $state('');
-  async function tester() {
-    testMsg = '';
-    const r = await testerNotification();
-    permState = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
-    testMsg = r === 'ok' ? 'Notification envoyée. Vérifie ton volet de notifications.' : r;
   }
 
   let fileInput;
@@ -131,17 +123,16 @@
     </div>
   </section>
 
-  <!-- Rappels -->
+  <!-- Rappel mensuel -->
   <section class="card">
-    <div class="eyebrow" style="margin-bottom:12px">Rappels mensuels</div>
-    <div class="row" style="border:0;padding-top:0">
-      <span class="k">Activer les rappels</span>
+    <div class="row" style="border:0;padding:0">
+      <span class="k">Rappel mensuel</span>
       <Toggle checked={app.params.rappelActif ?? false} onchange={activerRappels} />
     </div>
     {#if app.params.rappelActif}
       <div class="rows">
         <div class="row">
-          <span class="k">Jour du mois</span>
+          <span class="k">Jour</span>
           <div class="cluster">
             <span class="text-3">le</span>
             <input class="input mini" type="number" min="1" max="28" value={app.params.rappelJour ?? 1}
@@ -149,12 +140,12 @@
           </div>
         </div>
         <div class="row">
-          <span class="k">Heure du rappel</span>
+          <span class="k">Heure</span>
           <input class="input mini" type="time" value={app.params.rappelHeure ?? '09:00'}
                  onchange={(e) => maj('rappelHeure', e.currentTarget.value)} />
         </div>
         <div class="row">
-          <span class="k">Relance toutes les</span>
+          <span class="k">Relance</span>
           <div class="seg">
             {#each [1, 2, 4] as h}
               <button class:on={(app.params.rappelIntervalHeures ?? 2) === h} onclick={() => maj('rappelIntervalHeures', h)}>{h} h</button>
@@ -165,31 +156,17 @@
       {#if notificationsSupportees() && permState !== 'granted'}
         <p class="warn-note">
           <Icon name="alert-triangle" size={14} />
-          {permState === 'denied' ? 'Notifications bloquées par le navigateur — autorise-les dans les réglages du site.' : 'Autorisation des notifications requise.'}
+          {permState === 'denied' ? 'Notifications bloquées par le navigateur — autorise-les dans les réglages du site.' : 'Autorisation requise.'}
           {#if permState !== 'denied'}
             <button class="link" onclick={async () => (permState = await demanderPermission())}>Autoriser</button>
           {/if}
         </p>
       {/if}
-    {/if}
-
-    <button class="btn btn-secondary btn-block" style="margin-top:14px" onclick={tester}>
-      <Icon name="bell" size={16} /> Tester la notification
-    </button>
-    {#if testMsg}<p class="text-3" style="font-size:12.5px;margin:10px 0 0">{testMsg}</p>{/if}
-    <p class="text-3" style="font-size:12px;margin:10px 0 0">Ces rappels n'arrivent que lorsque l'app est ouverte ou au moment où tu l'ouvres. Pour un rappel même app fermée, utilise la section ci-dessous.</p>
-  </section>
-
-  <!-- Notifications push (app fermée) -->
-  <section class="card">
-    <div class="eyebrow" style="margin-bottom:12px">Rappel mensuel (app fermée)</div>
-    {#if !pushSupporte()}
-      <p class="text-3" style="font-size:13px;margin:0">Ton navigateur ne supporte pas les notifications push.</p>
-    {:else}
-      <p class="text-3" style="font-size:12.5px;margin:0 0 12px">Rappel automatique en début de mois (le 1er et le 2), même app fermée. Il relance selon ton <strong>jour / heure / intervalle</strong> ci-dessus et <strong>s'arrête tout seul</strong> dès que tu as saisi ton investissement du mois. Active l'abonnement, puis colle le texte obtenu dans le secret GitHub <strong>PUSH_SUBSCRIPTION</strong> (configuration en une fois).</p>
-      <button class="btn btn-secondary btn-block" onclick={activerNotifsPush}>
-        <Icon name="bell" size={16} /> {pushAbonne ? 'Régénérer mon abonnement' : 'Activer (app fermée)'}
-      </button>
+      {#if pushSupporte() && !pushAbonne}
+        <button class="btn btn-secondary btn-block" style="margin-top:10px" onclick={activerNotifsPush}>
+          <Icon name="bell" size={16} /> Activer aussi app fermée
+        </button>
+      {/if}
       {#if pushJson}
         <textarea class="input" readonly rows="4" value={pushJson}
                   style="margin-top:10px;font-size:11px;font-family:monospace;height:auto;resize:vertical"
