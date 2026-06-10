@@ -2,7 +2,10 @@ name: Rappel mensuel (push)
 
 on:
   schedule:
-    - cron: '0 8 1 * *'   # le 1er de chaque mois à 08:00 UTC (~9-10h en France)
+    # Battement régulier : toutes les heures, le 1er et le 2 du mois, de 7h à 19h UTC
+    # (~9h-21h en France). Le service worker décide à chaque tic s'il affiche le
+    # rappel (et s'arrête tout seul dès que l'investissement du mois est saisi).
+    - cron: '0 7-19 1,2 * *'
   workflow_dispatch:        # permet de lancer un envoi manuel pour tester
 
 jobs:

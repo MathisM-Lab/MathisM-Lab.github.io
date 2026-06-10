@@ -186,7 +186,7 @@
     {#if !pushSupporte()}
       <p class="text-3" style="font-size:13px;margin:0">Ton navigateur ne supporte pas les notifications push.</p>
     {:else}
-      <p class="text-3" style="font-size:12.5px;margin:0 0 12px">Un rappel automatique le 1er de chaque mois, même app fermée. Active l'abonnement, puis colle le texte obtenu dans le secret GitHub <strong>PUSH_SUBSCRIPTION</strong> (configuration en une fois).</p>
+      <p class="text-3" style="font-size:12.5px;margin:0 0 12px">Rappel automatique en début de mois (le 1er et le 2), même app fermée. Il relance selon ton <strong>jour / heure / intervalle</strong> ci-dessus et <strong>s'arrête tout seul</strong> dès que tu as saisi ton investissement du mois. Active l'abonnement, puis colle le texte obtenu dans le secret GitHub <strong>PUSH_SUBSCRIPTION</strong> (configuration en une fois).</p>
       <button class="btn btn-secondary btn-block" onclick={activerNotifsPush}>
         <Icon name="bell" size={16} /> {pushAbonne ? 'Régénérer mon abonnement' : 'Activer (app fermée)'}
       </button>
