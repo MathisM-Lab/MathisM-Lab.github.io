@@ -5,7 +5,7 @@
   import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
   import { projeteAuMois, evenementsProjection, mvtPrevuAuMois } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
-  import { saveEnveloppe } from '../lib/db.js';
+  import { saveEnveloppe, getEnveloppe } from '../lib/db.js';
   import LineChart from '../components/LineChart.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -16,35 +16,50 @@
   function paliersEnv(e) {
     return Array.isArray(e.paliers) ? e.paliers : [];
   }
-  async function persistPaliers(env, paliers) {
-    // Tri chronologique pour l'affichage. L'each est indexé par `id` (stable),
-    // donc réordonner ne désynchronise plus les champs de saisie.
-    paliers.sort((a, b) => (a.depuis < b.depuis ? -1 : a.depuis > b.depuis ? 1 : 0));
-    await saveEnveloppe({ ...$state.snapshot(env), paliers });
-    await app.reload();
+  // Les saisies de paliers déclenchent des écritures asynchrones (save + reload).
+  // Sans précaution, deux handlers qui se chevauchent (ex. blur d'un champ +
+  // clic corbeille, ou deux montants édités d'affilée) liraient tous les deux la
+  // même liste périmée et le dernier écraserait l'autre (« lost update » : un
+  // palier supprimé qui réapparaît, ou un montant remis à zéro).
+  // Parade : on sérialise les opérations dans une file, et chaque opération relit
+  // l'état FRAIS de la base juste avant d'écrire.
+  let fileEcriture = Promise.resolve();
+  function mutatePaliers(envId, transformer) {
+    fileEcriture = fileEcriture.then(async () => {
+      const fresh = await getEnveloppe(envId);
+      if (!fresh) return;
+      let paliers = (Array.isArray(fresh.paliers) ? fresh.paliers : []).map((p) => ({ ...p }));
+      paliers = transformer(paliers);
+      // Tri chronologique pour l'affichage (l'each est indexé par `id` stable).
+      paliers.sort((a, b) => (a.depuis < b.depuis ? -1 : a.depuis > b.depuis ? 1 : 0));
+      await saveEnveloppe({ ...fresh, paliers });
+      await app.reload();
+    });
+    return fileEcriture;
   }
-  async function ajouterPalier(env) {
-    const paliers = paliersEnv(env).map((p) => ({ ...p }));
-    // Nouveau palier au mois suivant le dernier (donc en bas, chronologiquement).
-    let depuis = dateDebutToMonthInput(app.params.dateDebut);
-    if (paliers.length) {
-      const dernier = paliers.reduce((max, p) => (p.depuis > max ? p.depuis : max), paliers[0].depuis);
-      depuis = moisToMonthInput(monthInputToMois(dernier, app.params.dateDebut) + 1, app.params.dateDebut);
-    }
-    paliers.push({ id: crypto.randomUUID(), depuis, montant: 0 });
-    await persistPaliers(env, paliers);
+  function ajouterPalier(env) {
+    return mutatePaliers(env.id, (paliers) => {
+      // Nouveau palier au mois suivant le dernier (donc en bas, chronologiquement).
+      let depuis = dateDebutToMonthInput(app.params.dateDebut);
+      if (paliers.length) {
+        const dernier = paliers.reduce((max, p) => (p.depuis > max ? p.depuis : max), paliers[0].depuis);
+        depuis = moisToMonthInput(monthInputToMois(dernier, app.params.dateDebut) + 1, app.params.dateDebut);
+      }
+      paliers.push({ id: crypto.randomUUID(), depuis, montant: 0 });
+      return paliers;
+    });
   }
-  async function majPalier(env, id, champ, valeur) {
-    const paliers = paliersEnv(env).map((p) => ({ ...p }));
-    const cible = paliers.find((p) => p.id === id);
-    if (!cible) return;
-    if (champ === 'montant') cible.montant = Number(String(valeur).replace(',', '.')) || 0;
-    else cible.depuis = valeur;
-    await persistPaliers(env, paliers);
+  function majPalier(env, id, champ, valeur) {
+    return mutatePaliers(env.id, (paliers) => {
+      const cible = paliers.find((p) => p.id === id);
+      if (!cible) return paliers;
+      if (champ === 'montant') cible.montant = Number(String(valeur).replace(',', '.')) || 0;
+      else cible.depuis = valeur;
+      return paliers;
+    });
   }
-  async function retirerPalier(env, id) {
-    const paliers = paliersEnv(env).filter((p) => p.id !== id);
-    await persistPaliers(env, paliers);
+  function retirerPalier(env, id) {
+    return mutatePaliers(env.id, (paliers) => paliers.filter((p) => p.id !== id));
   }
   // Versement réellement prévu ce mois-ci (somme des paliers actifs), pour info.
   let totalMvtCourant = $derived(
