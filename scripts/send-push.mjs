@@ -17,7 +17,7 @@ const abonnements = Array.isArray(parsed) ? parsed : [parsed];
 
 const payload = JSON.stringify({
   title: 'MonPortefeuille',
-  body: 'Nouveau mois : pense à investir et à valider tes enveloppes.',
+  body: 'Nouveau mois : pense à investir.',
   url: '/'
 });
 

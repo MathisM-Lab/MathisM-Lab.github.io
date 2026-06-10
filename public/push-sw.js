@@ -5,7 +5,7 @@ self.addEventListener('push', (event) => {
   try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
   const titre = data.title || 'MonPortefeuille';
   const options = {
-    body: data.body || "C'est le moment de vérifier tes investissements du mois.",
+    body: data.body || 'Nouveau mois : pense à investir.',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag: 'rappel-mensuel',
