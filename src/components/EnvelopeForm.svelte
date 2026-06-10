@@ -34,7 +34,14 @@
         return (err = `Tu as déjà une enveloppe ${form.type}. Un seul ${form.type} est autorisé.`);
       }
     }
-    if (gereActifs && form.actifs.length) {
+    // Rendement annuel projeté : toujours demandé, donc obligatoire.
+    const rdt = String(form.rendementAnnuelPct).trim();
+    if (rdt === '' || !Number.isFinite(Number(rdt))) return (err = 'Indique le rendement annuel projeté.');
+    if (gereActifs) {
+      // Frais de courtage et actifs cibles : demandés pour ce type, donc obligatoires.
+      const frais = String(form.fraisPct).trim();
+      if (frais === '' || !Number.isFinite(Number(frais))) return (err = 'Indique les frais de courtage.');
+      if (form.actifs.length === 0) return (err = 'Ajoute au moins un actif cible.');
       if (form.actifs.some((a) => !a.nom.trim())) return (err = 'Chaque actif doit avoir un nom.');
       if (Math.abs(totalCible - 100) > 0.01) return (err = `La somme des cibles doit être 100 % (actuellement ${totalCible} %).`);
     }
@@ -89,7 +96,7 @@
     <label class="label" for="ef-rdt">Rendement annuel projeté (%)</label>
     <input class="input" id="ef-rdt" type="number" step="0.1" bind:value={form.rendementAnnuelPct}
            placeholder={gereActifs ? 'Ex. 7' : 'Ex. 2,4'} />
-    <p class="text-3" style="font-size:12px;margin:6px 0 0">Sert uniquement à la courbe « Plan ». Laisse vide pour la valeur par défaut du type.</p>
+    <p class="text-3" style="font-size:12px;margin:6px 0 0">Sert à la courbe « Plan total ».</p>
   </div>
 
   {#if gereActifs}

@@ -158,7 +158,7 @@
       }
     }
     const out = [];
-    if (aUnPlan) out.push({ name: 'Plan', color: 'var(--text-3)', dashed: true, points: proj });
+    if (aUnPlan) out.push({ name: 'Plan total', color: 'var(--text-3)', dashed: true, points: proj });
     out.push({ name: 'Versé', color: '#9B7DFF', points: verse });
     out.push({ name: 'Valeur', color: 'var(--accent)', points: valeur });
     return out;
