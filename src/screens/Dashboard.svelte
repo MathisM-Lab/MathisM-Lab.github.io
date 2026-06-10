@@ -90,7 +90,8 @@
       </span>
     </div>
     <div class="rows" style="margin-top:14px">
-      <div class="row"><span class="k">Total versé</span><span class="v">{euros(pat.verseTotal)}</span></div>
+      <div class="row"><span class="k">Total versé <span class="text-3">(FC)</span></span><span class="v">{euros(pat.verseTotal)}</span></div>
+      <div class="row"><span class="k">Total versé <span class="text-3">(HF)</span></span><span class="v">{euros(pat.verseTotalHF)}</span></div>
       <div class="row"><span class="k">Investi ce mois</span><span class="v">{euros(investiCeMois)}</span></div>
     </div>
   </div>

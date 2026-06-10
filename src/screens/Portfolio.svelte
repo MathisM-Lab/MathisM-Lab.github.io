@@ -150,7 +150,8 @@
       <div class="card">
         <div class="eyebrow" style="margin-bottom:6px">Synthèse {env.nom}</div>
         <div class="rows">
-          <div class="row"><span class="k">Total versé</span><span class="v">{euros(agg.verseTotal)}</span></div>
+          <div class="row"><span class="k">Total versé <span class="text-3">(FC)</span></span><span class="v">{euros(agg.verseTotal)}</span></div>
+          <div class="row"><span class="k">Total versé <span class="text-3">(HF)</span></span><span class="v">{euros(agg.verseTotalHF)}</span></div>
           <div class="row"><span class="k">Valeur actuelle</span><span class="v">{euros(agg.valeurActuelle)}</span></div>
           <div class="row">
             <span class="k">Plus-value</span>

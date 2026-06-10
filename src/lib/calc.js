@@ -14,14 +14,15 @@ export function prixActif(actif, prixMap) {
 export function actifsAgreges(enveloppe, transactions, prixMap) {
   const byId = new Map();
   for (const a of enveloppe.actifs) {
-    byId.set(a.id, { ...a, partsTotales: 0, verseTotal: 0 });
+    byId.set(a.id, { ...a, partsTotales: 0, verseTotal: 0, verseTotalHF: 0 });
   }
   for (const tx of transactions) {
     if (tx.enveloppe !== enveloppe.id) continue;
     const e = byId.get(tx.actifId);
     if (!e) continue;
     e.partsTotales += tx.parts ?? 0;
-    e.verseTotal += tx.montant ?? 0;
+    e.verseTotal += tx.montant ?? 0;                         // frais compris
+    e.verseTotalHF += tx.montantHorsFrais ?? tx.montant ?? 0; // hors frais
   }
   const valeurEnv = [...byId.values()].reduce(
     (s, a) => s + a.partsTotales * prixActif(a, prixMap), 0
@@ -43,17 +44,19 @@ export function actifsAgreges(enveloppe, transactions, prixMap) {
 
 export function enveloppeAgregee(enveloppe, transactions, prixMap) {
   if (estLivret(enveloppe)) {
-    const verseTotal = transactions
-      .filter((t) => t.enveloppe === enveloppe.id)
-      .reduce((s, t) => s + (t.montant ?? 0), 0);
-    return { verseTotal, valeurActuelle: verseTotal, plusValue: 0, plusValuePct: 0 };
+    const txEnv = transactions.filter((t) => t.enveloppe === enveloppe.id);
+    const verseTotal = txEnv.reduce((s, t) => s + (t.montant ?? 0), 0);
+    const verseTotalHF = txEnv.reduce((s, t) => s + (t.montantHorsFrais ?? t.montant ?? 0), 0);
+    return { verseTotal, verseTotalHF, valeurActuelle: verseTotal, plusValue: 0, plusValuePct: 0 };
   }
   const actifs = actifsAgreges(enveloppe, transactions, prixMap);
   const verseTotal = actifs.reduce((s, a) => s + a.verseTotal, 0);
+  const verseTotalHF = actifs.reduce((s, a) => s + a.verseTotalHF, 0);
   const valeurActuelle = actifs.reduce((s, a) => s + a.valeur, 0);
   const plusValue = valeurActuelle - verseTotal;
   return {
     verseTotal,
+    verseTotalHF,
     valeurActuelle,
     plusValue,
     plusValuePct: verseTotal > 0 ? plusValue / verseTotal : 0
@@ -61,16 +64,18 @@ export function enveloppeAgregee(enveloppe, transactions, prixMap) {
 }
 
 export function patrimoine(enveloppes, transactions, prixMap) {
-  let verseTotal = 0, valeurActuelle = 0;
+  let verseTotal = 0, verseTotalHF = 0, valeurActuelle = 0;
   const parEnveloppe = enveloppes.map((env) => {
     const a = enveloppeAgregee(env, transactions, prixMap);
     verseTotal += a.verseTotal;
+    verseTotalHF += a.verseTotalHF;
     valeurActuelle += a.valeurActuelle;
     return { enveloppe: env, ...a };
   });
   const plusValue = valeurActuelle - verseTotal;
   return {
     verseTotal,
+    verseTotalHF,
     valeurActuelle,
     plusValue,
     plusValuePct: verseTotal > 0 ? plusValue / verseTotal : 0,
