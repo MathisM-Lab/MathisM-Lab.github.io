@@ -9,6 +9,7 @@
   import { saveEnveloppe, getEnveloppe } from '../lib/db.js';
   import LineChart from '../components/LineChart.svelte';
   import Icon from '../components/Icon.svelte';
+  import Sheet from '../components/Sheet.svelte';
 
   // Au démarrage de l'écran : télécharge l'historique mensuel des prix en arrière-plan.
   onMount(() => { app.rafraichirHistorique(); });
@@ -61,6 +62,25 @@
   }
   function retirerPalier(env, id) {
     return mutatePaliers(env.id, (paliers) => paliers.filter((p) => p.id !== id));
+  }
+
+  // Confirmation de suppression de palier : recopier un code fixe.
+  const MOT_SUPPR_PALIER = 'wLnYsJdKqP';
+  let suppPalier = $state(null); // { env, id } | null
+  let suppPalierTexte = $state('');
+  let suppPalierOk = $derived(suppPalierTexte === MOT_SUPPR_PALIER);
+
+  function demanderSuppressionPalier(env, id) {
+    suppPalier = { env, id };
+    suppPalierTexte = '';
+  }
+
+  async function confirmerSuppressionPalier() {
+    if (!suppPalierOk || !suppPalier) return;
+    const { env, id } = suppPalier;
+    suppPalier = null;
+    suppPalierTexte = '';
+    await retirerPalier(env, id);
   }
   // Versement réellement prévu ce mois-ci (somme des paliers actifs), pour info.
   let totalMvtCourant = $derived(
@@ -292,7 +312,7 @@
                      onchange={(ev) => majPalier(e, p.id, 'depuis', ev.currentTarget.value)} />
               <input class="input palier-montant" type="number" step="10" min="0" value={p.montant}
                      onchange={(ev) => majPalier(e, p.id, 'montant', ev.currentTarget.value)} /><span class="text-3">€</span>
-              <button class="icon-btn palier-del" onclick={() => retirerPalier(e, p.id)} aria-label="Retirer le palier">
+              <button class="icon-btn palier-del" onclick={() => demanderSuppressionPalier(e, p.id)} aria-label="Retirer le palier">
                 <Icon name="trash" size={15} />
               </button>
             </div>
@@ -315,6 +335,21 @@
       <p class="empty">Aucune enveloppe. Crée-en une dans Portefeuille.</p>
     {/if}
   </div>
+
+
+{#if suppPalier}
+  <Sheet title="Supprimer ce palier" onClose={() => { suppPalier = null; suppPalierTexte = ''; }}>
+    <p class="text-2" style="font-size:13.5px;margin:0 0 10px">
+      Pour confirmer, recopie exactement <strong style="color:var(--text)">{MOT_SUPPR_PALIER}</strong> ci-dessous (respecte les majuscules).
+    </p>
+    <input class="input" type="text" bind:value={suppPalierTexte} placeholder={MOT_SUPPR_PALIER}
+           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+    <div class="cluster" style="margin-top:12px;gap:10px">
+      <button class="btn btn-secondary grow" onclick={() => { suppPalier = null; suppPalierTexte = ''; }}>Annuler</button>
+      <button class="btn btn-danger grow" onclick={confirmerSuppressionPalier} disabled={!suppPalierOk}>Supprimer</button>
+    </div>
+  </Sheet>
+{/if}
 
 </div>
 
