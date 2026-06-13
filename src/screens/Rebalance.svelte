@@ -28,6 +28,7 @@
     const m = Number(montant);
     if (!Number.isFinite(m) || m <= 0 || !env) { resultat = null; return; }
     const actifs = positions.map((a) => ({
+      id: a.id,
       nom: a.nom,
       prix: a.prix,
       cible: (a.ciblePct ?? 0) / 100,
@@ -73,7 +74,7 @@
           <Icon name="refresh" size={15} /> {app.refreshingPrices ? '…' : 'Actualiser'}
         </button>
       </div>
-      {#each positions as a (a.nom)}
+      {#each positions as a (a.id)}
         {@const mp = a.ticker ? app.prix.get(a.ticker) : null}
         <div class="prow">
           <div style="min-width:0">
@@ -112,7 +113,7 @@
     <!-- Résultats -->
     {#if resultat}
       <div class="stack">
-        {#each resultat.lignes as l (l.nom)}
+        {#each resultat.lignes as l (l.id)}
           <div class="card res" class:zero={l.parts === 0}>
             <div class="between">
               <div>

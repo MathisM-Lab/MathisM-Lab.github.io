@@ -36,13 +36,13 @@
 <div class="onboarding">
   <div class="wizard-card">
     <h2>Bienvenue</h2>
-    <p class="muted">
+    <p class="text-2">
       Ton suivi démarre vierge. Crée tes enveloppes (PEA, Livret A, CTO…) puis ajoute
       tes transactions depuis la page Portefeuille. Tout est modifiable plus tard.
     </p>
 
     {#if err}
-      <p style="color: var(--danger); margin-top: 12px;">{err}</p>
+      <p style="color: var(--neg); margin-top: 12px;">{err}</p>
     {/if}
 
     <div class="actions">
@@ -66,11 +66,11 @@
   .wizard-card {
     width: 100%;
     max-width: 480px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-card);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-card);
     padding: 24px;
-    box-shadow: var(--shadow-card);
+    box-shadow: var(--shadow-pop);
   }
 
   h2 { margin-bottom: 8px; }

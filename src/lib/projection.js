@@ -92,19 +92,7 @@ export function projeteAuMois(serie, mois) {
   return serie[clamp]?.totalProjete ?? 0;
 }
 
-// Valeur projetée d'une enveloppe précise pour un mois donné.
-export function projeteEnveloppeAuMois(serie, envId, mois) {
-  if (!serie?.length) return 0;
-  const clamp = Math.max(0, Math.min(mois, serie.length - 1));
-  return serie[clamp]?.parEnv?.[envId] ?? 0;
-}
-
 // Y a-t-il une projection définie (au moins un versement prévu) ?
 export function aUneProjection(serie) {
   return !!serie?.length && serie[serie.length - 1].totalProjete > 0;
-}
-
-// Plus d'événements ponctuels en dur : conservé pour compatibilité d'import.
-export function evenementsProjection() {
-  return [];
 }

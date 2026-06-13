@@ -21,14 +21,8 @@ export function getDB() {
         if (!db.objectStoreNames.contains('parametres')) {
           db.createObjectStore('parametres', { keyPath: 'cle' });
         }
-        if (!db.objectStoreNames.contains('moisValides')) {
-          db.createObjectStore('moisValides', { keyPath: 'cle' });
-        }
         if (!db.objectStoreNames.contains('prixCache')) {
           db.createObjectStore('prixCache', { keyPath: 'ticker' });
-        }
-        if (!db.objectStoreNames.contains('projection')) {
-          db.createObjectStore('projection', { keyPath: 'mois' });
         }
         if (!db.objectStoreNames.contains('prixHistorique')) {
           db.createObjectStore('prixHistorique', { keyPath: 'ticker' });
@@ -43,11 +37,9 @@ export function getDB() {
 }
 
 // === Paramètres (clé/valeur) ===
-export async function getParam(cle, defaultValue = null) {
-  const db = await getDB();
-  const row = await db.get('parametres', cle);
-  return row ? row.valeur : defaultValue;
-}
+// Clés techniques écrites par le service worker (push) : à exclure des paramètres
+// exposés à l'app et de l'export de profil.
+const estCleTechnique = (cle) => typeof cle === 'string' && cle.startsWith('mp_');
 
 export async function setParam(cle, valeur) {
   const db = await getDB();
@@ -57,7 +49,7 @@ export async function setParam(cle, valeur) {
 export async function getAllParams() {
   const db = await getDB();
   const rows = await db.getAll('parametres');
-  return Object.fromEntries(rows.map(r => [r.cle, r.valeur]));
+  return Object.fromEntries(rows.filter((r) => !estCleTechnique(r.cle)).map(r => [r.cle, r.valeur]));
 }
 
 // === Enveloppes ===
@@ -94,11 +86,6 @@ export async function getTransactions() {
   return db.getAll('transactions');
 }
 
-export async function getTransactionsByEnveloppe(enveloppeId) {
-  const db = await getDB();
-  return db.getAllFromIndex('transactions', 'enveloppe', enveloppeId);
-}
-
 export async function addTransaction(tx) {
   const db = await getDB();
   const withDate = { ...tx, dateSaisie: tx.dateSaisie ?? new Date().toISOString() };
@@ -122,11 +109,6 @@ export async function setPrixCache(ticker, prix) {
 }
 
 // === Historique de prix hebdomadaire (ticker -> { 'YYYY-MM-DD': cours }) ===
-export async function getPrixHebdo(ticker) {
-  const db = await getDB();
-  return db.get('prixHebdo', ticker);
-}
-
 export async function setPrixHebdo(ticker, points, derniereMAJ) {
   const db = await getDB();
   await db.put('prixHebdo', { ticker, points, derniereMAJ });
@@ -138,27 +120,9 @@ export async function getAllPrixHebdo() {
 }
 
 // === Historique de prix mensuel (ticker -> { 'YYYY-MM': cours }) ===
-export async function getAllPrixHistorique() {
-  const db = await getDB();
-  return db.getAll('prixHistorique');
-}
-
 export async function setPrixHistorique(ticker, points) {
   const db = await getDB();
   await db.put('prixHistorique', { ticker, points, horodatage: Date.now() });
-}
-
-// === Projection ===
-export async function getProjection() {
-  const db = await getDB();
-  return db.getAll('projection');
-}
-
-export async function setProjectionBatch(rows) {
-  const db = await getDB();
-  const tx = db.transaction('projection', 'readwrite');
-  await Promise.all(rows.map(r => tx.store.put(r)));
-  await tx.done;
 }
 
 // === Export / Import du profil ===
@@ -173,6 +137,10 @@ export async function exportProfil() {
   const db = await getDB();
   const data = {};
   for (const s of STORES_PROFIL) data[s] = await db.getAll(s);
+  // N'exporte pas les clés techniques (écrites par le service worker push).
+  if (Array.isArray(data.parametres)) {
+    data.parametres = data.parametres.filter((r) => !estCleTechnique(r.cle));
+  }
   return {
     app: 'MonPortefeuille',
     type: 'profil',
@@ -207,7 +175,9 @@ export async function importProfil(payload) {
 // === Reset complet (debug / paramètres) ===
 export async function wipeAll() {
   const db = await getDB();
-  const stores = ['transactions', 'enveloppes', 'parametres', 'moisValides', 'prixCache', 'projection', 'prixHistorique', 'prixHebdo'];
+  // Ne vide que les stores réellement présents (robuste après évolution du schéma).
+  const stores = [...db.objectStoreNames];
+  if (stores.length === 0) return;
   const tx = db.transaction(stores, 'readwrite');
   await Promise.all(stores.map(s => tx.objectStore(s).clear()));
   await tx.done;

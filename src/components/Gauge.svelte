@@ -20,7 +20,6 @@
     width: 100%;
     background: var(--surface-2);
     border-radius: var(--r-pill);
-    overflow: hidden;
   }
   .fill {
     height: 100%;

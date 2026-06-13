@@ -83,14 +83,6 @@ export function patrimoine(enveloppes, transactions, prixMap) {
   };
 }
 
-// Patrimoine réel à la fin d'un mois donné, en se basant uniquement sur les
-// versements (cost basis) cumulés jusqu'à ce mois — sert de série "réalité".
-export function patrimoineVerseAuMois(enveloppes, transactions, mois) {
-  return transactions
-    .filter((t) => (t.mois ?? 0) <= mois)
-    .reduce((s, t) => s + (t.montant ?? 0), 0);
-}
-
 // ---- Rééquilibrage : algorithme à 2 passages ----
 // actifs : [{ nom, prix, cible (fraction 0..1), valeurActuelle }]
 export function rebalance({ montantDisponible, fraisCourtage = 0.005, ordreMinimum = 200, actifs }) {
@@ -126,7 +118,7 @@ export function rebalance({ montantDisponible, fraisCourtage = 0.005, ordreMinim
       parts = 0;
     }
     const cout = parts * facteur(a.prix);
-    p1.set(a.nom, parts);
+    p1.set(a.id, parts);
     sommeP1 += cout;
   });
 
@@ -139,17 +131,17 @@ export function rebalance({ montantDisponible, fraisCourtage = 0.005, ordreMinim
     const alloc = budgetRestant * a.cible;
     let parts = Math.floor(alloc / facteur(a.prix));
     if (parts * a.prix < ordreMinimum) parts = 0;
-    p2.set(a.nom, parts);
+    p2.set(a.id, parts);
     sommeP2 += parts * facteur(a.prix);
   });
 
   // Totaux par actif (dans l'ordre d'origine).
   const lignes = actifs.map((a) => {
-    const partsP1 = p1.get(a.nom) ?? 0;
-    const partsP2 = p2.get(a.nom) ?? 0;
+    const partsP1 = p1.get(a.id) ?? 0;
+    const partsP2 = p2.get(a.id) ?? 0;
     const parts = partsP1 + partsP2;
     const cout = parts * facteur(a.prix);
-    return { nom: a.nom, prix: a.prix, cible: a.cible, partsP1, partsP2, parts, cout };
+    return { id: a.id, nom: a.nom, prix: a.prix, cible: a.cible, partsP1, partsP2, parts, cout };
   });
 
   const totalDepense = lignes.reduce((s, l) => s + l.cout, 0);

@@ -30,6 +30,10 @@
   let livret = $derived(env ? estLivret(env) : false);
   let actifs = $derived(env && !livret ? actifsAgreges(env, app.transactions, app.prix) : []);
   let agg = $derived(env ? enveloppeAgregee(env, app.transactions, app.prix) : null);
+  // Cache local : sans ça, chaque accès à `app.srri` recalcule toute la matrice
+  // SRRI (plusieurs fois par rendu via les accès dans le markup).
+  let srri = $derived(app.srri);
+  let envSRRI = $derived(env ? srri.parEnveloppe.get(env.id) : null);
 
   let txEnv = $derived(
     app.transactions.filter((t) => t.enveloppe === selId).sort((a, b) => (b.mois ?? 0) - (a.mois ?? 0) || (b.id ?? 0) - (a.id ?? 0))
@@ -107,9 +111,9 @@
         <div class="display" style="margin-top:6px">{euros(agg.valeurActuelle, { noCents: true })}</div>
       </div>
     {:else}
-      {#each actifs as a (a.nom)}
+      {#each actifs as a (a.id)}
         {@const mp = majPrix(a)}
-        {@const actifSRRI = app.srri.parActif.get(a.id)}
+        {@const actifSRRI = srri.parActif.get(a.id)}
         <div class="card">
           <div class="between" style="align-items:flex-start">
             <div style="min-width:0">
@@ -166,12 +170,12 @@
               {signedEuros(agg.plusValue)} · {pct(agg.plusValuePct, { signed: true })}
             </span>
           </div>
-          {#if app.srri.parEnveloppe.get(env.id)}
+          {#if envSRRI}
             <div class="row">
               <span class="k">Risque enveloppe</span>
               <span class="v">
-                <span class="srri-inline" style="color:{srriColor(app.srri.parEnveloppe.get(env.id).srri)}">SRRI {app.srri.parEnveloppe.get(env.id).srri}</span>
-                · σ {pct(app.srri.parEnveloppe.get(env.id).vol, { digits: 1 })}
+                <span class="srri-inline" style="color:{srriColor(envSRRI.srri)}">SRRI {envSRRI.srri}</span>
+                · σ {pct(envSRRI.vol, { digits: 1 })}
               </span>
             </div>
           {/if}

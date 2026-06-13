@@ -3,7 +3,7 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct, eurosCompact } from '../lib/format.js';
   import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
-  import { projeteAuMois, evenementsProjection, mvtPrevuAuMois } from '../lib/projection.js';
+  import { projeteAuMois, mvtPrevuAuMois } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
   import { aDesActifs } from '../lib/defaults.js';
   import { saveEnveloppe, getEnveloppe } from '../lib/db.js';
@@ -243,9 +243,6 @@
     return out;
   });
 
-  let markers = $derived(evenementsProjection(serie).filter((e) => e.mois <= horizon));
-
-
   // Indicateurs
   let projeteMaintenant = $derived(projeteAuMois(serie, mc));
   let ecart = $derived(pat.valeurActuelle - projeteMaintenant);
@@ -282,20 +279,13 @@
              bind:value={horizon} aria-label="Horizon du graphique" />
       <span class="horizon-val">{labelHorizon(horizon)}</span>
     </div>
-    <LineChart {series} {markers} height={240}
+    <LineChart {series} height={240}
       formatX={(m) => moisToLabelCourt(m, app.params.dateDebut)} formatY={eurosCompact} />
     <div class="ev-legend">
       {#each series as s}
         <span class="ev"><span class="dot" style="background:{s.color}"></span>{s.name}</span>
       {/each}
     </div>
-    {#if markers.length}
-      <div class="ev-legend">
-        {#each markers as ev}
-          <span class="ev"><span class="dot" style="background:var(--neg)"></span>{moisToLabelCourt(ev.mois, app.params.dateDebut)} · {ev.label}</span>
-        {/each}
-      </div>
-    {/if}
   </div>
 
   <!-- Mon plan : paliers de versement mensuel -->

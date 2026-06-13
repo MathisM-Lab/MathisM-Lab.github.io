@@ -118,11 +118,20 @@ export function calculerSRRI(enveloppes, prixMap, transactions, prixHebdo) {
   const tousActifsGlobal = [];
   let valeurTotale = 0;
 
+  // Pré-agrégation en une seule passe (évite un filter() par actif/enveloppe).
+  // actifId est un UUID unique par actif : on peut l'utiliser seul comme clé.
+  const partsParActif = new Map();
+  const montantParEnv = new Map();
+  for (const t of transactions) {
+    if (t.actifId != null) {
+      partsParActif.set(t.actifId, (partsParActif.get(t.actifId) ?? 0) + (t.parts ?? 0));
+    }
+    montantParEnv.set(t.enveloppe, (montantParEnv.get(t.enveloppe) ?? 0) + (t.montant ?? 0));
+  }
+
   for (const env of enveloppes) {
     if (estLivret(env)) {
-      const valeurEnv = transactions
-        .filter((t) => t.enveloppe === env.id)
-        .reduce((s, t) => s + (t.montant ?? 0), 0);
+      const valeurEnv = montantParEnv.get(env.id) ?? 0;
       parEnveloppe.set(env.id, { srri: 1, vol: 0 });
       if (valeurEnv > 0) {
         tousActifsGlobal.push({ poids: valeurEnv, pointsHebdo: null, volManuelle: 0 });
@@ -133,9 +142,7 @@ export function calculerSRRI(enveloppes, prixMap, transactions, prixHebdo) {
 
     const actifsEnv = [];
     for (const actif of env.actifs ?? []) {
-      const parts = transactions
-        .filter((t) => t.enveloppe === env.id && t.actifId === actif.id)
-        .reduce((s, t) => s + (t.parts ?? 0), 0);
+      const parts = partsParActif.get(actif.id) ?? 0;
       const valeur = parts * prixActif(actif, prixMap);
 
       const points = actif.ticker ? prixHebdo.get(actif.ticker)?.points : null;

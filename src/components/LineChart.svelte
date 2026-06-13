@@ -2,15 +2,11 @@
   import { eurosCompact } from '../lib/format.js';
 
   // series : [{ name, color, dashed?, points: [{x, y}] }]
-  // markers : [{ x, label?, color? }]   objective : number | null
   let {
     series = [],
-    markers = [],
-    objective = null,
     height = 220,
     formatY = eurosCompact,
-    formatX = (x) => String(x),
-    yMinZero = true
+    formatX = (x) => String(x)
   } = $props();
 
   let w = $state(0);
@@ -22,10 +18,9 @@
   let allPts = $derived(series.flatMap((s) => s.points ?? []));
   let xMin = $derived(allPts.length ? Math.min(...allPts.map((p) => p.x)) : 0);
   let xMax = $derived(allPts.length ? Math.max(...allPts.map((p) => p.x)) : 1);
-  let yMaxRaw = $derived(allPts.length ? Math.max(...allPts.map((p) => p.y), objective ?? -Infinity) : 1);
-  let yMinRaw = $derived(yMinZero ? 0 : (allPts.length ? Math.min(...allPts.map((p) => p.y)) : 0));
-  let yMax = $derived(yMaxRaw === yMinRaw ? yMinRaw + 1 : yMaxRaw + (yMaxRaw - yMinRaw) * 0.08);
-  let yMin = $derived(yMinRaw);
+  let yMaxRaw = $derived(allPts.length ? Math.max(...allPts.map((p) => p.y)) : 1);
+  let yMin = 0;
+  let yMax = $derived(yMaxRaw === yMin ? yMin + 1 : yMaxRaw + (yMaxRaw - yMin) * 0.08);
 
   const sx = (x) => padL + ((x - xMin) / ((xMax - xMin) || 1)) * plotW;
   const sy = (y) => padT + (1 - (y - yMin) / ((yMax - yMin) || 1)) * plotH;
@@ -90,20 +85,6 @@
       <!-- labels X -->
       {#each xTicks as t}
         <text x={sx(t)} y={height - 6} text-anchor="middle" class="axis">{formatX(Math.round(t))}</text>
-      {/each}
-
-      <!-- objectif -->
-      {#if objective != null}
-        <line x1={padL} x2={w - padR} y1={sy(objective)} y2={sy(objective)}
-              stroke="var(--warn)" stroke-width="1.5" stroke-dasharray="5 4" opacity="0.8" />
-      {/if}
-
-      <!-- marqueurs événements -->
-      {#each markers as m}
-        {#if m.x >= xMin && m.x <= xMax}
-          <line x1={sx(m.x)} x2={sx(m.x)} y1={padT} y2={height - padB}
-                stroke={m.color ?? 'var(--neg)'} stroke-width="1" stroke-dasharray="3 3" opacity="0.55" />
-        {/if}
       {/each}
 
       <!-- séries -->

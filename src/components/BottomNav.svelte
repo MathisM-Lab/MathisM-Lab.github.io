@@ -32,10 +32,10 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: calc(var(--nav-height) + var(--safe-bottom));
-    padding-bottom: var(--safe-bottom);
-    background: var(--bg-elevated);
-    border-top: 1px solid var(--border);
+    height: calc(var(--nav-h) + var(--safe-b));
+    padding-bottom: var(--safe-b);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
     display: flex;
     z-index: 100;
     backdrop-filter: blur(8px);
@@ -48,12 +48,12 @@
     align-items: center;
     justify-content: center;
     gap: 2px;
-    color: var(--text-faint);
+    color: var(--text-3);
     transition: color 0.15s;
   }
 
   .nav-item.active {
-    color: var(--accent-2);
+    color: var(--accent);
   }
 
   .icon {
