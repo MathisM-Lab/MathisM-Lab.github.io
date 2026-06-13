@@ -5,6 +5,7 @@
   import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
   import { projeteAuMois, evenementsProjection, mvtPrevuAuMois } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
+  import { aDesActifs } from '../lib/defaults.js';
   import { saveEnveloppe, getEnveloppe } from '../lib/db.js';
   import LineChart from '../components/LineChart.svelte';
   import Icon from '../components/Icon.svelte';
@@ -87,6 +88,31 @@
   let mc = $derived(app.moisCourant);
   let pat = $derived(app.patrimoine);
 
+  // Taux mensuel d'une enveloppe (miroir de projection.js, basé sur les params en cours).
+  function tauxMensuelEnv(e) {
+    const raw = e.rendementAnnuelPct;
+    const annuel = raw === '' || raw == null ? null : Number(raw);
+    if (annuel != null && Number.isFinite(annuel)) return (1 + annuel / 100) ** (1 / 12) - 1;
+    return aDesActifs(e.type) ? (app.params.rendementMensuel ?? 0.0056) : 0.002;
+  }
+
+  // Valeur réelle d'une seule enveloppe au mois m.
+  function valeurEnvAuMois(env, m) {
+    if (estLivret(env)) {
+      return app.transactions
+        .filter((t) => t.enveloppe === env.id && (t.mois ?? 0) <= m)
+        .reduce((s, t) => s + (t.montant ?? 0), 0);
+    }
+    let total = 0;
+    for (const a of env.actifs ?? []) {
+      const parts = app.transactions
+        .filter((t) => t.enveloppe === env.id && t.actifId === a.id && (t.mois ?? 0) <= m)
+        .reduce((s, t) => s + (t.parts ?? 0), 0);
+      total += parts * prixActifAuMois(a, m);
+    }
+    return total;
+  }
+
   // Vues par enveloppe (envId null = total)
   let vues = $derived.by(() => {
     const base = [{ key: 'total', label: 'Total', envId: null }];
@@ -156,6 +182,30 @@
 
   let aUnPlan = $derived(serie.length > 0 && serie[serie.length - 1].totalProjete > 0);
 
+  // Projection "réelle" : part de la valeur actuelle réelle (par enveloppe) et applique
+  // la stratégie prévue (paliers + rendements) à partir d'aujourd'hui vers l'avenir.
+  let pointsProjectionReelle = $derived.by(() => {
+    if (!aUnPlan) return [];
+    const envsFiltrees = vue.envId == null
+      ? app.enveloppes
+      : app.enveloppes.filter((e) => e.id === vue.envId);
+    const etats = envsFiltrees.map((e) => ({
+      e,
+      valeur: valeurEnvAuMois(e, mc),
+      taux: tauxMensuelEnv(e)
+    }));
+    const points = [];
+    for (let m = mc; m <= horizon; m++) {
+      if (m > mc) {
+        for (const s of etats) {
+          s.valeur = s.valeur * (1 + s.taux) + mvtPrevuAuMois(s.e, m, app.params.dateDebut);
+        }
+      }
+      points.push({ x: m, y: etats.reduce((sum, s) => sum + s.valeur, 0) });
+    }
+    return points;
+  });
+
   let series = $derived.by(() => {
     const proj = [], verse = [], valeur = [];
     for (let m = 0; m <= horizon; m++) {
@@ -166,9 +216,10 @@
       }
     }
     const out = [];
-    if (aUnPlan) out.push({ name: 'Plan total', color: 'var(--text-3)', dashed: true, points: proj });
+    if (aUnPlan) out.push({ name: 'Plan initial', color: 'var(--text-3)', dashed: true, points: proj });
     out.push({ name: 'Versé', color: '#9B7DFF', points: verse });
     out.push({ name: 'Valeur', color: 'var(--accent)', points: valeur });
+    if (aUnPlan) out.push({ name: 'Projection', color: '#52C974', points: pointsProjectionReelle });
     return out;
   });
 
