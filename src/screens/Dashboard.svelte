@@ -2,7 +2,7 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct } from '../lib/format.js';
   import { moisToLabel } from '../lib/date.js';
-  import { projeteAuMois, aUneProjection } from '../lib/projection.js';
+  import { projeteAuMois, aUneProjection, mvtPrevuAuMois } from '../lib/projection.js';
   import { moisEstValide, enveloppesInvestiesAuMois } from '../lib/calc.js';
   import { ASSET_PALETTE } from '../lib/defaults.js';
   import { srriColor } from '../lib/srri.js';
@@ -28,6 +28,11 @@
   );
 
   let valide = $derived(moisEstValide(app.enveloppes, app.transactions, mc));
+  let planCeMois = $derived(
+    app.enveloppes
+      .map((e) => ({ nom: e.nom, couleur: e.couleur, montant: mvtPrevuAuMois(e, mc, app.params.dateDebut) }))
+      .filter((e) => e.montant > 0)
+  );
   let globalSRRI = $derived(app.srri.global);
   let manquantes = $derived(
     enveloppesInvestiesAuMois(app.enveloppes, app.transactions, mc).filter((x) => !x.investie).map((x) => x.enveloppe.nom)
@@ -71,14 +76,27 @@
 <div class="screen">
   <!-- Statut du mois -->
   <button class="status" class:ok={valide} onclick={ouvrirMois}>
-    {#if valide}
-      <span class="badge badge-pos"><Icon name="check-circle" size={15} /> Mois validé</span>
-      <span class="status-sub">{moisToLabel(mc, app.params.dateDebut)} · tout est investi</span>
-    {:else}
-      <span class="badge badge-warn"><Icon name="bell" size={15} /> En attente</span>
-      <span class="status-sub">{manquantes.length ? manquantes.join(' · ') : moisToLabel(mc, app.params.dateDebut)}</span>
+    <div class="status-top">
+      {#if valide}
+        <span class="badge badge-pos"><Icon name="check-circle" size={15} /> Mois validé</span>
+        <span class="status-sub">{moisToLabel(mc, app.params.dateDebut)} · tout est investi</span>
+      {:else}
+        <span class="badge badge-warn"><Icon name="bell" size={15} /> En attente</span>
+        <span class="status-sub">{manquantes.length ? manquantes.join(' · ') : moisToLabel(mc, app.params.dateDebut)}</span>
+      {/if}
+      <Icon name="chevron-right" size={18} />
+    </div>
+    {#if planCeMois.length}
+      <div class="plan-mois">
+        <div class="plan-titre">Ce mois-ci</div>
+        {#each planCeMois as item}
+          <div class="plan-ligne">
+            <span class="plan-env">{item.nom}</span>
+            <span class="plan-montant">{euros(item.montant)}</span>
+          </div>
+        {/each}
+      </div>
     {/if}
-    <Icon name="chevron-right" size={18} />
   </button>
 
   <!-- Patrimoine total -->
@@ -149,13 +167,18 @@
 
 <style>
   .status {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; flex-direction: column;
     width: 100%; text-align: left;
     padding: 14px 16px;
     background: var(--surface); border: 1px solid var(--line);
     border-radius: var(--r-card);
   }
-  .status :global(.chevron) { margin-left: auto; }
+  .status-top { display: flex; align-items: center; gap: 12px; }
   .status-sub { flex: 1; color: var(--text-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .status > :global(svg:last-child) { color: var(--text-3); flex-shrink: 0; }
+  .status-top > :global(svg:last-child) { color: var(--text-3); flex-shrink: 0; }
+  .plan-mois { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .plan-titre { font-size: 16px; font-weight: 650; color: var(--text-1); margin-bottom: 8px; }
+  .plan-ligne { display: flex; justify-content: space-between; align-items: center; padding: 3px 0; font-size: 13px; }
+  .plan-env { color: var(--text-2); }
+  .plan-montant { font-weight: 600; color: var(--text-1); }
 </style>
