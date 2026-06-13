@@ -5,6 +5,7 @@
   import { projeteAuMois, aUneProjection } from '../lib/projection.js';
   import { moisEstValide, enveloppesInvestiesAuMois } from '../lib/calc.js';
   import { ASSET_PALETTE } from '../lib/defaults.js';
+  import { srriColor } from '../lib/srri.js';
   import DonutChart from '../components/DonutChart.svelte';
   import Gauge from '../components/Gauge.svelte';
   import Calendar from '../components/Calendar.svelte';
@@ -27,6 +28,7 @@
   );
 
   let valide = $derived(moisEstValide(app.enveloppes, app.transactions, mc));
+  let globalSRRI = $derived(app.srri.global);
   let manquantes = $derived(
     enveloppesInvestiesAuMois(app.enveloppes, app.transactions, mc).filter((x) => !x.investie).map((x) => x.enveloppe.nom)
   );
@@ -93,6 +95,15 @@
       <div class="row"><span class="k">Total versé <span class="text-3">(FC)</span></span><span class="v">{euros(pat.verseTotal)}</span></div>
       <div class="row"><span class="k">Total versé <span class="text-3">(HF)</span></span><span class="v">{euros(pat.verseTotalHF)}</span></div>
       <div class="row"><span class="k">Investi ce mois</span><span class="v">{euros(investiCeMois)}</span></div>
+      {#if globalSRRI}
+        <div class="row">
+          <span class="k">Risque portefeuille</span>
+          <span class="v">
+            <span style="font-weight:650;color:{srriColor(globalSRRI.srri)}">SRRI {globalSRRI.srri}</span>
+            · σ {pct(globalSRRI.vol, { digits: 1 })}
+          </span>
+        </div>
+      {/if}
     </div>
   </div>
 

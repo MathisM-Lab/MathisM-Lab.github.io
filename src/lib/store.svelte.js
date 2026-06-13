@@ -1,8 +1,9 @@
-import { getAllParams, getEnveloppes, getTransactions, getDB, deleteTransaction, setPrixHistorique } from './db.js';
-import { refreshPrix, refreshHistorique } from './prices.js';
+import { getAllParams, getEnveloppes, getTransactions, getDB, deleteTransaction, setPrixHistorique, getAllPrixHebdo, setPrixHebdo } from './db.js';
+import { refreshPrix, refreshHistorique, refreshHebdo } from './prices.js';
 import { genererProjection } from './projection.js';
 import { moisCourant as calcMoisCourant } from './date.js';
 import { patrimoine, moisEstValide } from './calc.js';
+import { calculerSRRI } from './srri.js';
 
 function createAppState() {
   let params = $state({});
@@ -10,6 +11,7 @@ function createAppState() {
   let transactions = $state([]);
   let prix = $state(new Map());        // ticker -> { prix, horodatage, ok }
   let prixHistorique = $state(new Map()); // ticker -> { 'YYYY-MM': cours }
+  let prixHebdo = $state(new Map());  // ticker -> { points: { 'YYYY-MM-DD': cours }, derniereMAJ }
   let loaded = $state(false);
   let currentScreen = $state('dashboard');
   let refreshingPrices = $state(false);
@@ -28,6 +30,7 @@ function createAppState() {
     // Charge les prix en cache (sans réseau)
     await chargerPrixCache();
     await chargerHistoriqueCache();
+    await chargerPrixHebdoCache();
     loaded = true;
   }
 
@@ -88,6 +91,26 @@ function createAppState() {
     prixHistorique = m;
   }
 
+  async function chargerPrixHebdoCache() {
+    const rows = await getAllPrixHebdo();
+    const m = new Map();
+    for (const r of rows) m.set(r.ticker, { points: r.points, derniereMAJ: r.derniereMAJ });
+    prixHebdo = m;
+  }
+
+  // Rafraîchit les prix hebdomadaires (SRRI). Incrémental : ne fetch que le delta si cache < 7j.
+  async function rafraichirHebdo() {
+    const tickers = enveloppes.flatMap((e) => (e.actifs ?? []).map((a) => a.ticker)).filter(Boolean);
+    if (tickers.length === 0) return;
+    const res = await refreshHebdo(tickers, prixHebdo);
+    const m = new Map(prixHebdo);
+    for (const [ticker, data] of res) {
+      m.set(ticker, data);
+      await setPrixHebdo(ticker, data.points, data.derniereMAJ);
+    }
+    prixHebdo = m;
+  }
+
   // Rafraîchit l'historique mensuel des prix (pour la courbe de valeur réelle).
   async function rafraichirHistorique() {
     const tickers = enveloppes.flatMap((e) => (e.actifs ?? []).map((a) => a.ticker)).filter(Boolean);
@@ -123,6 +146,7 @@ function createAppState() {
     get transactions() { return transactions; },
     get prix() { return prix; },
     get prixHistorique() { return prixHistorique; },
+    get prixHebdo() { return prixHebdo; },
     get loaded() { return loaded; },
     get refreshingPrices() { return refreshingPrices; },
     get currentScreen() { return currentScreen; },
@@ -143,8 +167,11 @@ function createAppState() {
     get moisCourantValide() {
       return moisEstValide(enveloppes, transactions, calcMoisCourant(params.dateDebut));
     },
+    get srri() {
+      return calculerSRRI(enveloppes, prix, transactions, prixHebdo);
+    },
 
-    load, reload, rafraichirPrix, rafraichirHistorique
+    load, reload, rafraichirPrix, rafraichirHistorique, rafraichirHebdo
   };
 }
 

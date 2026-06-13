@@ -1,7 +1,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'monportefeuille';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise;
 
@@ -32,6 +32,9 @@ export function getDB() {
         }
         if (!db.objectStoreNames.contains('prixHistorique')) {
           db.createObjectStore('prixHistorique', { keyPath: 'ticker' });
+        }
+        if (!db.objectStoreNames.contains('prixHebdo')) {
+          db.createObjectStore('prixHebdo', { keyPath: 'ticker' });
         }
       }
     });
@@ -118,6 +121,22 @@ export async function setPrixCache(ticker, prix) {
   await db.put('prixCache', { ticker, prix, horodatage: Date.now() });
 }
 
+// === Historique de prix hebdomadaire (ticker -> { 'YYYY-MM-DD': cours }) ===
+export async function getPrixHebdo(ticker) {
+  const db = await getDB();
+  return db.get('prixHebdo', ticker);
+}
+
+export async function setPrixHebdo(ticker, points, derniereMAJ) {
+  const db = await getDB();
+  await db.put('prixHebdo', { ticker, points, derniereMAJ });
+}
+
+export async function getAllPrixHebdo() {
+  const db = await getDB();
+  return db.getAll('prixHebdo');
+}
+
 // === Historique de prix mensuel (ticker -> { 'YYYY-MM': cours }) ===
 export async function getAllPrixHistorique() {
   const db = await getDB();
@@ -188,7 +207,7 @@ export async function importProfil(payload) {
 // === Reset complet (debug / paramètres) ===
 export async function wipeAll() {
   const db = await getDB();
-  const stores = ['transactions', 'enveloppes', 'parametres', 'moisValides', 'prixCache', 'projection', 'prixHistorique'];
+  const stores = ['transactions', 'enveloppes', 'parametres', 'moisValides', 'prixCache', 'projection', 'prixHistorique', 'prixHebdo'];
   const tx = db.transaction(stores, 'readwrite');
   await Promise.all(stores.map(s => tx.objectStore(s).clear()));
   await tx.done;

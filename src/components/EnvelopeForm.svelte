@@ -8,6 +8,7 @@
 
   let { enveloppe = null, onClose } = $props();
 
+  const videActif = () => ({ id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, prixDefaut: 0, sri: null, vev: '' });
   const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', paliers: [], actifs: [] };
   // En édition, `enveloppe` est un proxy réactif Svelte -> $state.snapshot (structuredClone planterait).
   const source = untrack(() => enveloppe);
@@ -19,7 +20,7 @@
   let totalCible = $derived(form.actifs.reduce((s, a) => s + Number(a.ciblePct || 0), 0));
 
   function ajouterActif() {
-    form.actifs = [...form.actifs, { id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, prixDefaut: 0 }];
+    form.actifs = [...form.actifs, videActif()];
   }
   function retirerActif(i) {
     form.actifs = form.actifs.filter((_, idx) => idx !== i);
@@ -129,6 +130,21 @@
             <span class="text-3">%</span>
           </div>
         </div>
+        {#if !form.actifs[i].ticker?.trim()}
+          <div class="actif-row" style="margin-top:6px;gap:8px">
+            <div class="sri-wrap">
+              <label class="text-3" style="font-size:11px;margin-bottom:3px;display:block">SRI (1-7)</label>
+              <input class="input" type="number" min="1" max="7" step="1"
+                     bind:value={form.actifs[i].sri} placeholder="—" />
+            </div>
+            <div style="flex:1">
+              <label class="text-3" style="font-size:11px;margin-bottom:3px;display:block">VEV % <span style="font-weight:400">(optionnel, plus précis)</span></label>
+              <input class="input" type="number" step="0.1" min="0"
+                     bind:value={form.actifs[i].vev} placeholder="Ex. 7,2" />
+            </div>
+          </div>
+          <p class="text-3" style="font-size:11px;margin:4px 0 0">Disponibles dans le KID/DIC de l'actif. Mis à jour 1×/an.</p>
+        {/if}
       </div>
     {/each}
     {#if form.actifs.length === 0}
@@ -154,4 +170,5 @@
   .actif-row .input:first-child { flex: 1; }
   .cible-wrap { display: flex; align-items: center; gap: 6px; }
   .cible-wrap .input { width: 76px; text-align: right; }
+  .sri-wrap { width: 72px; flex-shrink: 0; }
 </style>

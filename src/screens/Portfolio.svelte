@@ -4,6 +4,7 @@
   import { euros, signedEuros, pct, num, horodatageRelatif } from '../lib/format.js';
   import { moisToLabel } from '../lib/date.js';
   import { actifsAgreges, enveloppeAgregee, estLivret } from '../lib/calc.js';
+  import { srriColor } from '../lib/srri.js';
   import { deleteTransaction, deleteEnveloppe } from '../lib/db.js';
   import TransactionForm from '../components/TransactionForm.svelte';
   import EnvelopeForm from '../components/EnvelopeForm.svelte';
@@ -23,7 +24,7 @@
     if (selId == null && app.enveloppes.length) selId = app.enveloppes[0].id;
   });
 
-  onMount(() => { app.rafraichirPrix(); });
+  onMount(() => { app.rafraichirPrix(); app.rafraichirHebdo(); });
 
   let env = $derived(app.enveloppes.find((e) => e.id === selId));
   let livret = $derived(env ? estLivret(env) : false);
@@ -108,6 +109,7 @@
     {:else}
       {#each actifs as a (a.nom)}
         {@const mp = majPrix(a)}
+        {@const actifSRRI = app.srri.parActif.get(a.id)}
         <div class="card">
           <div class="between" style="align-items:flex-start">
             <div style="min-width:0">
@@ -124,6 +126,11 @@
                   <span class="text-3">· prix manuel</span>
                 {/if}
               </div>
+              {#if actifSRRI}
+                <div class="srri-badge" style="--srri-c:{srriColor(actifSRRI.srri)}">
+                  SRRI {actifSRRI.srri} · σ {pct(actifSRRI.vol, { digits: 1 })}
+                </div>
+              {/if}
             </div>
             <div style="text-align:right">
               <div class="amount" style="font-size:19px;font-weight:650">{euros(a.valeur)}</div>
@@ -159,6 +166,15 @@
               {signedEuros(agg.plusValue)} · {pct(agg.plusValuePct, { signed: true })}
             </span>
           </div>
+          {#if app.srri.parEnveloppe.get(env.id)}
+            <div class="row">
+              <span class="k">Risque enveloppe</span>
+              <span class="v">
+                <span class="srri-inline" style="color:{srriColor(app.srri.parEnveloppe.get(env.id).srri)}">SRRI {app.srri.parEnveloppe.get(env.id).srri}</span>
+                · σ {pct(app.srri.parEnveloppe.get(env.id).vol, { digits: 1 })}
+              </span>
+            </div>
+          {/if}
         </div>
       </div>
     {/if}
@@ -227,6 +243,15 @@
   .supp-card { border-color: rgba(234, 57, 67, 0.25); }
 
   .px { font-size: 12px; margin-top: 3px; }
+
+  .srri-badge {
+    display: inline-block; margin-top: 6px;
+    padding: 2px 8px; border-radius: var(--r-pill);
+    background: color-mix(in srgb, var(--srri-c) 15%, transparent);
+    color: var(--srri-c);
+    font-size: 11.5px; font-weight: 600;
+  }
+  .srri-inline { font-weight: 650; }
 
   .repart { margin-top: 14px; }
   .track { position: relative; height: 8px; background: var(--surface-2); border-radius: var(--r-pill); }
