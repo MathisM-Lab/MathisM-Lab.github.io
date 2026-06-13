@@ -1,6 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
   import { app } from './lib/store.svelte.js';
+  import { demanderPersistance } from './lib/db.js';
   import { verifierEtNotifier, programmerRelance, arreterRelance } from './lib/notifications.js';
   import BottomNav from './components/BottomNav.svelte';
   import Onboarding from './components/Onboarding.svelte';
@@ -27,6 +28,9 @@
   }
 
   onMount(async () => {
+    // Demande un stockage persistant (anti-effacement automatique). Sans attente :
+    // ne doit pas retarder l'affichage.
+    demanderPersistance();
     await app.load();
     if (app.params.onboardingDone) {
       verifierEtNotifier(etat());

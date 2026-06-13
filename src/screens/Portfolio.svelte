@@ -9,16 +9,14 @@
   import TransactionForm from '../components/TransactionForm.svelte';
   import EnvelopeForm from '../components/EnvelopeForm.svelte';
   import Icon from '../components/Icon.svelte';
+  import ConfirmRecopie from '../components/ConfirmRecopie.svelte';
 
   let selId = $state(null);
   let showForm = $state(false);
   let editing = $state(undefined); // undefined = fermé, null = nouvelle, objet = édition
 
-  // Suppression d'enveloppe : recopier exactement une chaîne fixe pour confirmer.
-  const MOT_SUPPR = 'kVmZpXqRbN';
+  // Suppression d'enveloppe : confirmation par recopie d'un code (ConfirmRecopie).
   let suppEnv = $state(null); // enveloppe en cours de suppression, ou null
-  let suppTexte = $state('');
-  let suppOk = $derived(suppTexte === MOT_SUPPR);
 
   $effect(() => {
     if (selId == null && app.enveloppes.length) selId = app.enveloppes[0].id;
@@ -52,16 +50,14 @@
 
   function demanderSuppression(e) {
     suppEnv = e;
-    suppTexte = '';
   }
 
   async function confirmerSuppression() {
-    if (!suppOk || !suppEnv) return;
+    if (!suppEnv) return;
     const id = suppEnv.id;
     await deleteEnveloppe(id);
     if (selId === id) selId = null;
     suppEnv = null;
-    suppTexte = '';
     await app.reload();
   }
 </script>
@@ -92,16 +88,11 @@
     {#if suppEnv && suppEnv.id === env.id}
       <div class="card supp-card">
         <div class="eyebrow neg" style="margin-bottom:10px">Supprimer « {env.nom} »</div>
-        <p class="text-2" style="font-size:13.5px;margin:0 0 10px">
-          Action irréversible : l'enveloppe et toutes ses transactions seront supprimées.
-          Pour confirmer, recopie exactement <strong style="color:var(--text)">{MOT_SUPPR}</strong> ci-dessous (respecte les majuscules).
-        </p>
-        <input class="input" type="text" bind:value={suppTexte} placeholder={MOT_SUPPR}
-               autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-        <div class="cluster" style="margin-top:12px;gap:10px">
-          <button class="btn btn-secondary grow" onclick={() => { suppEnv = null; suppTexte = ''; }}>Annuler</button>
-          <button class="btn btn-danger grow" onclick={confirmerSuppression} disabled={!suppOk}>Tout supprimer</button>
-        </div>
+        <ConfirmRecopie
+          message="Action irréversible : l'enveloppe et toutes ses transactions seront supprimées."
+          confirmLabel="Tout supprimer"
+          onConfirm={confirmerSuppression}
+          onCancel={() => (suppEnv = null)} />
       </div>
     {/if}
 

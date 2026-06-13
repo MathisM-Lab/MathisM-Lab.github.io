@@ -7,6 +7,7 @@
   import { demanderPermission, notificationsSupportees } from '../lib/notifications.js';
   import Toggle from '../components/Toggle.svelte';
   import Icon from '../components/Icon.svelte';
+  import ConfirmRecopie from '../components/ConfirmRecopie.svelte';
 
   let permState = $state(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported');
 
@@ -52,14 +53,23 @@
   let importMsg = $state('');
   let importErr = $state('');
 
-  async function exporterProfil() {
-    const payload = await exportProfil();
+  function telechargerJSON(payload, nom) {
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `monportefeuille-${new Date().toISOString().slice(0, 10)}.json`;
+    a.href = url; a.download = nom;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function horodatageFichier(d = new Date()) {
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}h${p(d.getMinutes())}`;
+  }
+
+  async function exporterProfil() {
+    const payload = await exportProfil();
+    telechargerJSON(payload, `monportefeuille-${new Date().toISOString().slice(0, 10)}.json`);
   }
 
   async function fichierChoisi(e) {
@@ -67,28 +77,41 @@
     const file = e.currentTarget.files?.[0];
     e.currentTarget.value = ''; // autorise à re-choisir le même fichier
     if (!file) return;
+
+    // Lecture + parsing : message clair si ce n'est pas un JSON exploitable.
+    let payload;
+    try {
+      payload = JSON.parse(await file.text());
+    } catch {
+      importErr = "Fichier illisible : ce n'est pas une sauvegarde MonPortefeuille (JSON invalide).";
+      return;
+    }
+
     // Restaurer remplace les données actuelles : on confirme si le profil n'est pas vide.
     const nonVide = app.transactions.length > 0 || app.enveloppes.length > 0;
-    if (nonVide && !confirm('Importer remplacera tes données actuelles. Continuer ?')) return;
+    if (nonVide && !confirm('Importer remplacera tes données actuelles. Une sauvegarde de sécurité de l’état actuel va d’abord être téléchargée. Continuer ?')) return;
+
+    // Filet de sécurité : on sauvegarde l'état actuel AVANT de l'écraser.
+    if (nonVide) {
+      try {
+        telechargerJSON(await exportProfil(), `monportefeuille-securite-avant-import-${horodatageFichier()}.json`);
+      } catch { /* on continue même si la sauvegarde de sécurité échoue */ }
+    }
+
     try {
-      const payload = JSON.parse(await file.text());
-      await importProfil(payload);
+      const counts = await importProfil(payload);
       await app.reload();
-      importMsg = 'Profil importé : tes données ont été restaurées.';
+      const env = counts.enveloppes ?? 0, tx = counts.transactions ?? 0;
+      importMsg = `Profil importé : ${env} enveloppe${env > 1 ? 's' : ''} et ${tx} transaction${tx > 1 ? 's' : ''} restaurées.`;
     } catch (err) {
       importErr = err?.message ?? String(err);
     }
   }
 
-  // Reset sécurisé : il faut recopier exactement une chaîne fixe de 10 caractères
-  // mêlant minuscules et majuscules (comparaison sensible à la casse).
-  const MOT_RESET = 'aXkQpZmRvT';
+  // Reset sécurisé : confirmation par recopie d'un code (voir ConfirmRecopie).
   let resetOuvert = $state(false);
-  let resetTexte = $state('');
-  let resetOk = $derived(resetTexte === MOT_RESET);
 
   async function reset() {
-    if (!resetOk) return;
     await wipeAll();
     location.reload();
   }
@@ -196,19 +219,15 @@
   <section class="card" style="border-color:rgba(234,57,67,0.25)">
     <div class="eyebrow neg" style="margin-bottom:12px">Zone dangereuse</div>
     {#if !resetOuvert}
-      <button class="btn btn-danger btn-block" onclick={() => { resetOuvert = true; resetTexte = ''; }}>
+      <button class="btn btn-danger btn-block" onclick={() => (resetOuvert = true)}>
         Réinitialiser toutes les données
       </button>
     {:else}
-      <p class="text-2" style="font-size:13.5px;margin:0 0 10px">
-        Action irréversible. Pour confirmer, recopie exactement <strong style="color:var(--text)">{MOT_RESET}</strong> ci-dessous (respecte les majuscules).
-      </p>
-      <input class="input" type="text" bind:value={resetTexte} placeholder={MOT_RESET} autocomplete="off"
-             autocapitalize="off" autocorrect="off" spellcheck="false" />
-      <div class="cluster" style="margin-top:12px;gap:10px">
-        <button class="btn btn-secondary grow" onclick={() => { resetOuvert = false; resetTexte = ''; }}>Annuler</button>
-        <button class="btn btn-danger grow" onclick={reset} disabled={!resetOk}>Tout effacer</button>
-      </div>
+      <ConfirmRecopie
+        message="Action irréversible."
+        confirmLabel="Tout effacer"
+        onConfirm={reset}
+        onCancel={() => (resetOuvert = false)} />
     {/if}
   </section>
 

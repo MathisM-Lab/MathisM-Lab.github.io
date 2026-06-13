@@ -5,6 +5,20 @@ const DB_VERSION = 3;
 
 let dbPromise;
 
+// Demande au navigateur de conserver durablement les données (anti-éviction
+// automatique : mémoire saturée, longue inactivité). Sans effet si déjà accordé
+// ou non supporté. Ne protège PAS d'un effacement manuel par l'utilisateur.
+// Renvoie true si le stockage est (ou devient) persistant.
+export async function demanderPersistance() {
+  try {
+    if (!navigator.storage?.persist) return false;
+    if (await navigator.storage.persisted?.()) return true;
+    return await navigator.storage.persist();
+  } catch {
+    return false;
+  }
+}
+
 export function getDB() {
   if (!dbPromise) {
     dbPromise = openDB(DB_NAME, DB_VERSION, {
@@ -150,26 +164,55 @@ export async function exportProfil() {
   };
 }
 
-// Restaure un profil. Ne touche QUE les stores connus présents dans le fichier :
-// - un store absent du fichier est laissé tel quel (vieux fichier -> donnée
-//   manquante simplement non importée) ;
-// - un store inconnu dans le fichier est ignoré (fichier d'une version récente).
+// Restaure un profil. Ne touche QUE les stores connus présents dans le fichier
+// (un store absent est laissé tel quel ; un store inconnu est ignoré). Un fichier
+// plus ANCIEN reste toujours importable : les nouveautés restent simplement vierges.
+//
+// Sécurités :
+//  - refus d'un fichier issu d'une version PLUS RÉCENTE de l'app (schema inconnu),
+//    plutôt que d'injecter des données qu'on ne saurait pas interpréter ;
+//  - validation légère de la forme (tableaux d'objets, enveloppes nommées) ;
+//  - remplacement atomique : si une écriture échoue, IndexedDB annule tout et les
+//    données actuelles restent intactes.
+//
+// Renvoie le décompte par store importé, ex. { enveloppes: 3, transactions: 42 }.
 export async function importProfil(payload) {
-  const data = payload?.data;
-  if (!data || typeof data !== 'object') throw new Error('Fichier invalide.');
+  if (!payload || typeof payload !== 'object') throw new Error('Fichier illisible ou vide.');
   if (payload.app && payload.app !== 'MonPortefeuille') {
-    throw new Error('Ce fichier ne provient pas de MonPortefeuille.');
+    throw new Error("Ce fichier ne provient pas de MonPortefeuille.");
   }
-  const db = await getDB();
+  const schema = Number(payload.schema);
+  if (Number.isFinite(schema) && schema > PROFIL_SCHEMA) {
+    throw new Error("Ce fichier vient d'une version plus récente de l'app. Mets l'application à jour avant d'importer.");
+  }
+  const data = payload.data;
+  if (!data || typeof data !== 'object') throw new Error('Aucune donnée reconnue dans le fichier.');
+
   const stores = STORES_PROFIL.filter((s) => Array.isArray(data[s]));
   if (stores.length === 0) throw new Error('Aucune donnée reconnue dans le fichier.');
+
+  // Validation légère : chaque store présent doit être un tableau d'objets.
+  for (const s of stores) {
+    if (!data[s].every((row) => row && typeof row === 'object')) {
+      throw new Error(`Données « ${s} » corrompues dans le fichier.`);
+    }
+  }
+  // Garde-fou métier : une enveloppe doit au moins porter un nom.
+  if (Array.isArray(data.enveloppes) && !data.enveloppes.every((e) => typeof e.nom === 'string')) {
+    throw new Error('Le fichier contient des enveloppes invalides.');
+  }
+
+  const db = await getDB();
   const tx = db.transaction(stores, 'readwrite');
+  const counts = {};
   for (const s of stores) {
     const store = tx.objectStore(s);
-    await store.clear();
-    for (const row of data[s]) await store.put(row);
+    store.clear();
+    for (const row of data[s]) store.put(row);
+    counts[s] = data[s].length;
   }
-  await tx.done;
+  await tx.done; // rejette (et annule tout) si une écriture a échoué
+  return counts;
 }
 
 // === Reset complet (debug / paramètres) ===

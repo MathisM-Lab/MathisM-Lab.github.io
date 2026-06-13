@@ -3,13 +3,13 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct, eurosCompact } from '../lib/format.js';
   import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
-  import { projeteAuMois, mvtPrevuAuMois } from '../lib/projection.js';
+  import { projeteAuMois, mvtPrevuAuMois, tauxMensuelEnv } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
-  import { aDesActifs } from '../lib/defaults.js';
   import { saveEnveloppe, getEnveloppe } from '../lib/db.js';
   import LineChart from '../components/LineChart.svelte';
   import Icon from '../components/Icon.svelte';
   import Sheet from '../components/Sheet.svelte';
+  import ConfirmRecopie from '../components/ConfirmRecopie.svelte';
 
   // Au démarrage de l'écran : télécharge l'historique mensuel des prix en arrière-plan.
   onMount(() => { app.rafraichirHistorique(); });
@@ -64,22 +64,17 @@
     return mutatePaliers(env.id, (paliers) => paliers.filter((p) => p.id !== id));
   }
 
-  // Confirmation de suppression de palier : recopier un code fixe.
-  const MOT_SUPPR_PALIER = 'wLnYsJdKqP';
+  // Confirmation de suppression de palier : recopie d'un code (ConfirmRecopie).
   let suppPalier = $state(null); // { env, id } | null
-  let suppPalierTexte = $state('');
-  let suppPalierOk = $derived(suppPalierTexte === MOT_SUPPR_PALIER);
 
   function demanderSuppressionPalier(env, id) {
     suppPalier = { env, id };
-    suppPalierTexte = '';
   }
 
   async function confirmerSuppressionPalier() {
-    if (!suppPalierOk || !suppPalier) return;
+    if (!suppPalier) return;
     const { env, id } = suppPalier;
     suppPalier = null;
-    suppPalierTexte = '';
     await retirerPalier(env, id);
   }
   // Versement réellement prévu ce mois-ci (somme des paliers actifs), pour info.
@@ -107,14 +102,6 @@
   let serie = $derived(app.projection);
   let mc = $derived(app.moisCourant);
   let pat = $derived(app.patrimoine);
-
-  // Taux mensuel d'une enveloppe (miroir de projection.js, basé sur les params en cours).
-  function tauxMensuelEnv(e) {
-    const raw = e.rendementAnnuelPct;
-    const annuel = raw === '' || raw == null ? null : Number(raw);
-    if (annuel != null && Number.isFinite(annuel)) return (1 + annuel / 100) ** (1 / 12) - 1;
-    return aDesActifs(e.type) ? (app.params.rendementMensuel ?? 0.0056) : 0.002;
-  }
 
   // Valeur réelle d'une seule enveloppe au mois m.
   function valeurEnvAuMois(env, m) {
@@ -212,7 +199,7 @@
     const etats = envsFiltrees.map((e) => ({
       e,
       valeur: valeurEnvAuMois(e, mc),
-      taux: tauxMensuelEnv(e)
+      taux: tauxMensuelEnv(e, { rendementMensuel: app.params.rendementMensuel ?? 0.0056 })
     }));
     const points = [];
     for (let m = mc; m <= horizon; m++) {
@@ -328,16 +315,11 @@
 
 
 {#if suppPalier}
-  <Sheet title="Supprimer ce palier" onClose={() => { suppPalier = null; suppPalierTexte = ''; }}>
-    <p class="text-2" style="font-size:13.5px;margin:0 0 10px">
-      Pour confirmer, recopie exactement <strong style="color:var(--text)">{MOT_SUPPR_PALIER}</strong> ci-dessous (respecte les majuscules).
-    </p>
-    <input class="input" type="text" bind:value={suppPalierTexte} placeholder={MOT_SUPPR_PALIER}
-           autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-    <div class="cluster" style="margin-top:12px;gap:10px">
-      <button class="btn btn-secondary grow" onclick={() => { suppPalier = null; suppPalierTexte = ''; }}>Annuler</button>
-      <button class="btn btn-danger grow" onclick={confirmerSuppressionPalier} disabled={!suppPalierOk}>Supprimer</button>
-    </div>
+  <Sheet title="Supprimer ce palier" onClose={() => (suppPalier = null)}>
+    <ConfirmRecopie
+      confirmLabel="Supprimer"
+      onConfirm={confirmerSuppressionPalier}
+      onCancel={() => (suppPalier = null)} />
   </Sheet>
 {/if}
 

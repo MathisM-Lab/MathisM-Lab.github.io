@@ -33,6 +33,19 @@ export function mvtPrevuAuMois(enveloppe, mois, dateDebut) {
   return montant;
 }
 
+// Taux mensuel d'une enveloppe : son rendement annuel propre s'il est défini,
+// sinon le défaut selon le type (investissement ou livret). Source unique,
+// réutilisée par la projection "plan" et par la projection "réelle" (Evolution).
+export function tauxMensuelEnv(e, {
+  rendementMensuel = 0.0056,
+  rendementLivretMensuel = TAUX_LIVRET_MENSUEL
+} = {}) {
+  const raw = e.rendementAnnuelPct;
+  const annuel = raw === '' || raw == null ? null : Number(raw);
+  if (annuel != null && Number.isFinite(annuel)) return (1 + annuel / 100) ** (1 / 12) - 1;
+  return aDesActifs(e.type) ? rendementMensuel : rendementLivretMensuel;
+}
+
 export function genererProjection({
   enveloppes = [],
   rendementMensuel = 0.0056,
@@ -41,21 +54,12 @@ export function genererProjection({
   dateDebut = undefined,
   maxMois = 365
 } = {}) {
-  // Taux mensuel d'une enveloppe : son rendement annuel propre s'il est défini,
-  // sinon le défaut selon le type (investissement ou livret).
-  const tauxMensuel = (e) => {
-    const raw = e.rendementAnnuelPct;
-    const annuel = raw === '' || raw == null ? null : Number(raw);
-    if (annuel != null && Number.isFinite(annuel)) return (1 + annuel / 100) ** (1 / 12) - 1;
-    return aDesActifs(e.type) ? rendementMensuel : rendementLivretMensuel;
-  };
-
   // Prépare l'état de chaque enveloppe.
   const etats = enveloppes.map((e) => ({
     id: e.id,
     nom: e.nom,
     paliers: paliersDe(e, dateDebut),
-    taux: tauxMensuel(e),
+    taux: tauxMensuelEnv(e, { rendementMensuel, rendementLivretMensuel }),
     valeur: 0
   }));
 
