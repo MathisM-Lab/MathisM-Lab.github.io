@@ -153,29 +153,10 @@
       <Toggle checked={app.params.rappelActif ?? false} onchange={activerRappels} />
     </div>
     {#if app.params.rappelActif}
-      <div class="rows">
-        <div class="row">
-          <span class="k">Jour</span>
-          <div class="cluster">
-            <span class="text-3">le</span>
-            <input class="input mini" type="number" min="1" max="28" value={app.params.rappelJour ?? 1}
-                   onchange={(e) => maj('rappelJour', Math.min(28, Math.max(1, Number(e.currentTarget.value) || 1)))} />
-          </div>
-        </div>
-        <div class="row">
-          <span class="k">Heure</span>
-          <input class="input mini" type="time" value={app.params.rappelHeure ?? '09:00'}
-                 onchange={(e) => maj('rappelHeure', e.currentTarget.value)} />
-        </div>
-        <div class="row">
-          <span class="k">Relance</span>
-          <div class="seg">
-            {#each [1, 2, 4] as h}
-              <button class:on={(app.params.rappelIntervalHeures ?? 2) === h} onclick={() => maj('rappelIntervalHeures', h)}>{h} h</button>
-            {/each}
-          </div>
-        </div>
-      </div>
+      <p class="text-3" style="font-size:12.5px;margin:8px 0 0">
+        Rappel automatique les 1<sup>er</sup>, 2 et 3 du mois (le matin, toutes les 2h), même app fermée.
+        Il s'arrête tout seul dès que le plan « Ce mois-ci » est fait.
+      </p>
       {#if notificationsSupportees() && permState !== 'granted'}
         <p class="warn-note">
           <Icon name="alert-triangle" size={14} />

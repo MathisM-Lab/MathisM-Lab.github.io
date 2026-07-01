@@ -4,10 +4,7 @@ export const DEFAULT_PARAMS = {
   fraisCourtage: 0.005,
   ordreMinimum: 200,
   rendementMensuel: 0.0056,
-  rappelActif: false,
-  rappelHeure: '09:00',
-  rappelJour: 1,            // jour du mois à partir duquel le rappel se déclenche
-  rappelIntervalHeures: 2,
+  rappelActif: false,       // interrupteur on/off ; le planning est figé dans le cron GitHub
   onboardingDone: false,
   nomUtilisateur: 'Mathis',
   dateNaissance: '2003-10-02',

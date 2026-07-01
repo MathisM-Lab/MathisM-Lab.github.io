@@ -2,10 +2,12 @@ name: Rappel mensuel (push)
 
 on:
   schedule:
-    # Battement régulier : toutes les heures, le 1er et le 2 du mois, de 7h à 19h UTC
-    # (~9h-21h en France). Le service worker décide à chaque tic s'il affiche le
-    # rappel (et s'arrête tout seul dès que l'investissement du mois est saisi).
-    - cron: '0 7-19 1,2 * *'
+    # Rappel mensuel : les 1er, 2 et 3 du mois, toutes les 2h de 7h à 19h UTC
+    # (~9h-21h en France, l'été). Le service worker décide à chaque tic s'il
+    # affiche le rappel (et s'arrête tout seul dès que le plan du mois est fait).
+    # NB : GitHub peut retarder/sauter un créneau (planning "au mieux") et le
+    # décalage été/hiver déplace la fenêtre d'environ 1h — sans importance ici.
+    - cron: '0 7-19/2 1-3 * *'
   workflow_dispatch:        # permet de lancer un envoi manuel pour tester
     inputs:
       force:
