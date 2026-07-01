@@ -89,14 +89,20 @@ async function doitNotifier(now) {
 
 self.addEventListener('push', (event) => {
   event.waitUntil((async () => {
-    let afficher = true;
-    // En cas d'erreur de lecture, on affiche quand même (on préfère un rappel en
-    // trop à un rappel manqué).
-    try { afficher = await doitNotifier(new Date()); } catch { afficher = true; }
-    if (!afficher) return;
-
     let data = {};
     try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+
+    // Envoi de test (force=true) : on affiche TOUJOURS, sans tenir compte du
+    // jour / de l'heure / de l'anti-spam. Sert à isoler un problème de livraison
+    // Android d'un problème de logique.
+    let afficher = true;
+    if (!data.force) {
+      // En cas d'erreur de lecture, on affiche quand même (on préfère un rappel
+      // en trop à un rappel manqué).
+      try { afficher = await doitNotifier(new Date()); } catch { afficher = true; }
+    }
+    if (!afficher) return;
+
     await self.registration.showNotification(data.title || 'MonPortefeuille', {
       body: data.body || 'Nouveau mois : pense à investir.',
       icon: '/icon-192.png',

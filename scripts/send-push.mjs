@@ -15,10 +15,15 @@ webpush.setVapidDetails(VAPID_SUBJECT || 'mailto:mat2003mathis@gmail.com', VAPID
 const parsed = JSON.parse(PUSH_SUBSCRIPTION);
 const abonnements = Array.isArray(parsed) ? parsed : [parsed];
 
+// FORCE=true (envoi manuel de test) : le service worker affichera la notif sans
+// tenir compte du jour / de l'heure / de l'anti-spam.
+const force = process.env.FORCE === 'true';
+
 const payload = JSON.stringify({
-  title: 'MonPortefeuille',
-  body: 'Nouveau mois : pense à investir.',
-  url: '/'
+  title: force ? 'Test MonPortefeuille' : 'MonPortefeuille',
+  body: force ? 'Notification de test (app fermée).' : 'Nouveau mois : pense à investir.',
+  url: '/',
+  force
 });
 
 let ok = 0;

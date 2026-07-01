@@ -7,6 +7,11 @@ on:
     # rappel (et s'arrête tout seul dès que l'investissement du mois est saisi).
     - cron: '0 7-19 1,2 * *'
   workflow_dispatch:        # permet de lancer un envoi manuel pour tester
+    inputs:
+      force:
+        description: 'Forcer la notif (test : ignore jour/heure/anti-spam)'
+        type: boolean
+        default: true
 
 jobs:
   push:
@@ -23,3 +28,4 @@ jobs:
           VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
           VAPID_SUBJECT: ${{ secrets.VAPID_SUBJECT }}
           PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          FORCE: ${{ github.event.inputs.force }}
