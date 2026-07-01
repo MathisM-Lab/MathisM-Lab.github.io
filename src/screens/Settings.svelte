@@ -187,7 +187,7 @@
       {/if}
       {#if pushSupporte() && !pushAbonne}
         <button class="btn btn-secondary btn-block" style="margin-top:10px" onclick={activerNotifsPush}>
-          <Icon name="bell" size={16} /> Activer aussi app fermée
+          <Icon name="bell" size={16} /> Activer les notifications (app fermée)
         </button>
       {/if}
       {#if pushJson}

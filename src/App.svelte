@@ -1,8 +1,7 @@
 <script>
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount } from 'svelte';
   import { app } from './lib/store.svelte.js';
   import { demanderPersistance } from './lib/db.js';
-  import { verifierEtNotifier, programmerRelance, arreterRelance } from './lib/notifications.js';
   import BottomNav from './components/BottomNav.svelte';
   import Onboarding from './components/Onboarding.svelte';
   import Dashboard from './screens/Dashboard.svelte';
@@ -20,27 +19,11 @@
   };
   let Courant = $derived(ECRANS[app.currentScreen] ?? Dashboard);
 
-  function etat() {
-    return { params: app.params, enveloppes: app.enveloppes, transactions: app.transactions };
-  }
-  function onVisible() {
-    if (document.visibilityState === 'visible') verifierEtNotifier(etat());
-  }
-
   onMount(async () => {
     // Demande un stockage persistant (anti-effacement automatique). Sans attente :
     // ne doit pas retarder l'affichage.
     demanderPersistance();
     await app.load();
-    if (app.params.onboardingDone) {
-      verifierEtNotifier(etat());
-      programmerRelance(etat);
-      document.addEventListener('visibilitychange', onVisible);
-    }
-  });
-  onDestroy(() => {
-    arreterRelance();
-    document.removeEventListener('visibilitychange', onVisible);
   });
 </script>
 
