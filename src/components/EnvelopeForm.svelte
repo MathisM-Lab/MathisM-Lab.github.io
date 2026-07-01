@@ -8,15 +8,25 @@
 
   let { enveloppe = null, onClose } = $props();
 
-  const videActif = () => ({ id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, prixDefaut: 0, sri: null, vev: '' });
+  const videActif = () => ({ id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, rendementAnnuelPct: '', prixDefaut: 0, sri: null, vev: '' });
   const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', paliers: [], actifs: [] };
   // En édition, `enveloppe` est un proxy réactif Svelte -> $state.snapshot (structuredClone planterait).
   const source = untrack(() => enveloppe);
-  let form = $state(source ? $state.snapshot(source) : structuredClone(vide));
+  const initial = source ? $state.snapshot(source) : structuredClone(vide);
+  // Migration douce : les enveloppes créées avant le rendement par actif n'ont
+  // qu'un rendement d'enveloppe -> on le recopie sur chaque actif encore vide.
+  if (source && aDesActifs(initial.type) && initial.rendementAnnuelPct !== '' && initial.rendementAnnuelPct != null) {
+    for (const a of initial.actifs ?? []) {
+      if (a.rendementAnnuelPct === '' || a.rendementAnnuelPct == null) a.rendementAnnuelPct = initial.rendementAnnuelPct;
+    }
+  }
+  let form = $state(initial);
   let err = $state('');
   let saving = $state(false);
 
   let gereActifs = $derived(aDesActifs(form.type));
+  // En assurance-vie, les frais s'appliquent au versement (pas de courtage).
+  let fraisLabel = $derived(form.type === 'Assurance-vie' ? 'Frais sur versement' : 'Frais de courtage');
   let totalCible = $derived(form.actifs.reduce((s, a) => s + Number(a.ciblePct || 0), 0));
 
   function ajouterActif() {
@@ -35,16 +45,19 @@
         return (err = `Tu as déjà une enveloppe ${form.type}. Un seul ${form.type} est autorisé.`);
       }
     }
-    // Rendement annuel projeté : toujours demandé, donc obligatoire.
-    const rdt = String(form.rendementAnnuelPct).trim();
-    if (rdt === '' || !Number.isFinite(Number(rdt))) return (err = 'Indique le rendement annuel projeté.');
+    const estRdtValide = (v) => { const s = String(v ?? '').trim(); return s !== '' && Number.isFinite(Number(s)); };
     if (gereActifs) {
-      // Frais de courtage et actifs cibles : demandés pour ce type, donc obligatoires.
+      // Frais et actifs cibles : demandés pour ce type, donc obligatoires.
       const frais = String(form.fraisPct).trim();
-      if (frais === '' || !Number.isFinite(Number(frais))) return (err = 'Indique les frais de courtage.');
+      if (frais === '' || !Number.isFinite(Number(frais))) return (err = `Indique les ${fraisLabel.toLowerCase()}.`);
       if (form.actifs.length === 0) return (err = 'Ajoute au moins un actif cible.');
       if (form.actifs.some((a) => !a.nom.trim())) return (err = 'Chaque actif doit avoir un nom.');
+      // Rendement annuel : demandé par actif pour ce type.
+      if (form.actifs.some((a) => !estRdtValide(a.rendementAnnuelPct))) return (err = 'Indique le rendement annuel de chaque actif.');
       if (Math.abs(totalCible - 100) > 0.01) return (err = `La somme des cibles doit être 100 % (actuellement ${totalCible} %).`);
+    } else {
+      // Rendement annuel projeté au niveau de l'enveloppe.
+      if (!estRdtValide(form.rendementAnnuelPct)) return (err = 'Indique le rendement annuel projeté.');
     }
     // Empêche de supprimer un actif auquel des transactions sont rattachées.
     if (source && Array.isArray(source.actifs)) {
@@ -93,16 +106,18 @@
     </div>
   </div>
 
-  <div class="field">
-    <label class="label" for="ef-rdt">Rendement annuel projeté (%)</label>
-    <input class="input" id="ef-rdt" type="number" step="0.1" bind:value={form.rendementAnnuelPct}
-           placeholder={gereActifs ? 'Ex. 7' : 'Ex. 2,4'} />
-    <p class="text-3" style="font-size:12px;margin:6px 0 0">Sert à la courbe « Plan total ».</p>
-  </div>
+  {#if !gereActifs}
+    <div class="field">
+      <label class="label" for="ef-rdt">Rendement annuel projeté (%)</label>
+      <input class="input" id="ef-rdt" type="number" step="0.1" bind:value={form.rendementAnnuelPct}
+             placeholder="Ex. 2,4" />
+      <p class="text-3" style="font-size:12px;margin:6px 0 0">Sert à la courbe « Plan total ».</p>
+    </div>
+  {/if}
 
   {#if gereActifs}
     <div class="field">
-      <label class="label" for="ef-frais">Frais de courtage (%)</label>
+      <label class="label" for="ef-frais">{fraisLabel} (%)</label>
       <input class="input" id="ef-frais" type="number" step="0.01" min="0" bind:value={form.fraisPct} placeholder="Ex. 0,3" />
       <p class="text-3" style="font-size:12px;margin:6px 0 0">Ajoutés automatiquement au montant saisi lors d'un achat (et retranchés à une vente).</p>
     </div>
@@ -127,6 +142,13 @@
           <input class="input" bind:value={form.actifs[i].ticker} placeholder="Ticker (ex. CW8.PA)" />
           <div class="cible-wrap">
             <input class="input" type="number" min="0" max="100" bind:value={form.actifs[i].ciblePct} />
+            <span class="text-3">%</span>
+          </div>
+        </div>
+        <div class="actif-row" style="margin-top:6px;align-items:center">
+          <span class="text-3" style="font-size:12px;flex:1">Rendement annuel projeté</span>
+          <div class="cible-wrap">
+            <input class="input" type="number" step="0.1" bind:value={form.actifs[i].rendementAnnuelPct} placeholder="Ex. 6" />
             <span class="text-3">%</span>
           </div>
         </div>

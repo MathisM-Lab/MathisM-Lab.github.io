@@ -36,9 +36,9 @@ export const DEFAULT_ENVELOPPES = [
 export const ENVELOPPE_PALETTE = ['#3D7DFF', '#16C784', '#F0A92B', '#9B7DFF', '#FF8A5B', '#5BC0EB', '#EA3943'];
 export const ASSET_PALETTE     = ['#3D7DFF', '#16C784', '#F0A92B', '#9B7DFF', '#FF8A5B', '#5BC0EB', '#E879A6'];
 
-export const TYPES_ENVELOPPE = ['PEA', 'CTO', 'Livret A', 'SCPI', 'PER', 'Crypto', 'Autre'];
+export const TYPES_ENVELOPPE = ['PEA', 'CTO', 'Assurance-vie', 'Livret A', 'SCPI', 'PER', 'Crypto', 'Autre'];
 
 // Types d'enveloppe gérés par actifs avec cibles de rééquilibrage.
 export function aDesActifs(type) {
-  return type === 'PEA' || type === 'CTO' || type === 'Crypto';
+  return type === 'PEA' || type === 'CTO' || type === 'Assurance-vie' || type === 'Crypto';
 }

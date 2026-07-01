@@ -33,17 +33,41 @@ export function mvtPrevuAuMois(enveloppe, mois, dateDebut) {
   return montant;
 }
 
-// Taux mensuel d'une enveloppe : son rendement annuel propre s'il est défini,
-// sinon le défaut selon le type (investissement ou livret). Source unique,
-// réutilisée par la projection "plan" et par la projection "réelle" (Evolution).
+// Taux mensuel d'une enveloppe. Pour les enveloppes à actifs, c'est la moyenne
+// des rendements par actif pondérée par les cibles (un fonds euros à 2 % et un
+// ETF à 6 % ne se moyennent pas à la main). Repli : rendement d'enveloppe s'il
+// existe (compat. données antérieures au rendement par actif), sinon défaut du
+// type. Source unique, réutilisée par la projection "plan" et "réelle".
 export function tauxMensuelEnv(e, {
   rendementMensuel = 0.0056,
   rendementLivretMensuel = TAUX_LIVRET_MENSUEL
 } = {}) {
-  const raw = e.rendementAnnuelPct;
-  const annuel = raw === '' || raw == null ? null : Number(raw);
-  if (annuel != null && Number.isFinite(annuel)) return (1 + annuel / 100) ** (1 / 12) - 1;
-  return aDesActifs(e.type) ? rendementMensuel : rendementLivretMensuel;
+  const parse = (v) => (v === '' || v == null || !Number.isFinite(Number(v)) ? null : Number(v));
+  const mensuel = (annuel) => (1 + annuel / 100) ** (1 / 12) - 1;
+
+  const envAnnuel = parse(e.rendementAnnuelPct);
+
+  if (aDesActifs(e.type)) {
+    const actifs = Array.isArray(e.actifs) ? e.actifs : [];
+    let poidsTotal = 0, sommePondere = 0, aUnRendementActif = false;
+    for (const a of actifs) {
+      const poids = Number(a.ciblePct) || 0;
+      if (poids <= 0) continue;
+      // Rendement propre de l'actif, sinon repli sur celui de l'enveloppe.
+      const actifAnnuel = parse(a.rendementAnnuelPct);
+      const annuel = actifAnnuel != null ? actifAnnuel : envAnnuel;
+      if (annuel == null) continue;
+      if (actifAnnuel != null) aUnRendementActif = true;
+      poidsTotal += poids;
+      sommePondere += poids * annuel;
+    }
+    if (poidsTotal > 0 && aUnRendementActif) return mensuel(sommePondere / poidsTotal);
+    if (envAnnuel != null) return mensuel(envAnnuel);
+    return rendementMensuel;
+  }
+
+  if (envAnnuel != null) return mensuel(envAnnuel);
+  return rendementLivretMensuel;
 }
 
 export function genererProjection({
