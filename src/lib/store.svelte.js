@@ -15,6 +15,9 @@ function createAppState() {
   let loaded = $state(false);
   let currentScreen = $state('dashboard');
   let refreshingPrices = $state(false);
+  // Enveloppe à présélectionner au prochain affichage du Portefeuille (ex. après
+  // « Enregistrer ces transactions » depuis le rééquilibrage). Consommé une fois.
+  let portefeuilleEnv = $state(null);
 
   async function load() {
     const [p, env, tx] = await Promise.all([
@@ -151,6 +154,8 @@ function createAppState() {
     get refreshingPrices() { return refreshingPrices; },
     get currentScreen() { return currentScreen; },
     set currentScreen(v) { currentScreen = v; },
+    get portefeuilleEnv() { return portefeuilleEnv; },
+    set portefeuilleEnv(v) { portefeuilleEnv = v; },
 
     // Dérivés
     get moisCourant() { return calcMoisCourant(params.dateDebut); },

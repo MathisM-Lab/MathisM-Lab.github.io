@@ -3,7 +3,7 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, num, horodatageRelatif } from '../lib/format.js';
   import { actifsAgreges, rebalance } from '../lib/calc.js';
-  import { setParam } from '../lib/db.js';
+  import { setParam, addTransaction } from '../lib/db.js';
   import Icon from '../components/Icon.svelte';
 
   let investables = $derived(app.enveloppes.filter((e) => e.actifs?.length > 0));
@@ -13,6 +13,7 @@
 
   let montant = $state('');
   let resultat = $state(null);
+  let enregistrement = $state(false);
 
   onMount(() => { app.rafraichirPrix(); });
 
@@ -42,10 +43,41 @@
     });
   }
 
+  // Enregistre les achats calculés (parts > 0) comme transactions sur l'enveloppe
+  // courante, puis bascule sur le Portefeuille. Les montants reprennent exactement
+  // ceux affichés : hors frais = parts × prix, frais = coût affiché − hors frais.
+  async function implementer() {
+    if (!resultat || !env || enregistrement) return;
+    const lignes = resultat.lignes.filter((l) => l.parts > 0);
+    if (lignes.length === 0) return;
+    enregistrement = true;
+    try {
+      const mois = app.moisCourant;
+      for (const l of lignes) {
+        const montantHorsFrais = l.parts * l.prix;
+        await addTransaction({
+          mois,
+          actif: l.nom,
+          actifId: l.id,
+          enveloppe: env.id,
+          parts: l.parts,
+          montant: l.cout,
+          montantHorsFrais,
+          frais: l.cout - montantHorsFrais
+        });
+      }
+      await app.reload();
+      app.portefeuilleEnv = env.id;
+      app.currentScreen = 'portefeuille';
+    } finally {
+      enregistrement = false;
+    }
+  }
+
 </script>
 
 <div class="screen">
-  <div class="screen-head"><h1>Rééquilibrage</h1></div>
+  <div class="screen-head"><h1>Rééquilibrage{env ? ` ${env.nom}` : ''}</h1></div>
 
   {#if investables.length === 0}
     <div class="card"><p class="empty">Aucune enveloppe avec des actifs et cibles. Configure un PEA ou un CTO dans Réglages.</p></div>
@@ -134,6 +166,12 @@
             <div class="row"><span class="k">Reste en espèces</span><span class="v">{euros(resultat.resteEspeces)}</span></div>
           </div>
         </div>
+
+        {#if resultat.lignes.some((l) => l.parts > 0)}
+          <button class="btn btn-primary btn-block btn-lg" onclick={implementer} disabled={enregistrement}>
+            {enregistrement ? 'Enregistrement…' : 'Enregistrer ces transactions'}
+          </button>
+        {/if}
 
       </div>
     {/if}

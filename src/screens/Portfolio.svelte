@@ -19,7 +19,13 @@
   let suppEnv = $state(null); // enveloppe en cours de suppression, ou null
 
   $effect(() => {
-    if (selId == null && app.enveloppes.length) selId = app.enveloppes[0].id;
+    // Présélection demandée par un autre écran (ex. rééquilibrage), consommée une fois.
+    if (app.portefeuilleEnv != null) {
+      selId = app.portefeuilleEnv;
+      app.portefeuilleEnv = null;
+    } else if (selId == null && app.enveloppes.length) {
+      selId = app.enveloppes[0].id;
+    }
   });
 
   onMount(() => { app.rafraichirPrix(); app.rafraichirHebdo(); });
