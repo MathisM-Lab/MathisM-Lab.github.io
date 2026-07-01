@@ -27,7 +27,7 @@
     app.transactions.filter((t) => (t.mois ?? null) === mc).reduce((s, t) => s + (t.montant ?? 0), 0)
   );
 
-  let valide = $derived(moisEstValide(app.enveloppes, app.transactions, mc));
+  let valide = $derived(moisEstValide(app.enveloppes, app.transactions, mc, app.params.dateDebut));
   let planCeMois = $derived(
     app.enveloppes
       .map((e) => ({ nom: e.nom, couleur: e.couleur, montant: mvtPrevuAuMois(e, mc, app.params.dateDebut) }))
@@ -35,7 +35,7 @@
   );
   let globalSRRI = $derived(app.srri.global);
   let manquantes = $derived(
-    enveloppesInvestiesAuMois(app.enveloppes, app.transactions, mc).filter((x) => !x.investie).map((x) => x.enveloppe.nom)
+    enveloppesInvestiesAuMois(app.enveloppes, app.transactions, mc, app.params.dateDebut).filter((x) => !x.investie).map((x) => x.enveloppe.nom)
   );
 
   // Camembert
@@ -67,7 +67,7 @@
   function statusOf(m) {
     if (m > mc) return 'futur';
     if (m === mc) return valide ? 'valide' : 'encours';
-    return moisEstValide(app.enveloppes, app.transactions, m) ? 'valide' : 'manque';
+    return moisEstValide(app.enveloppes, app.transactions, m, app.params.dateDebut) ? 'valide' : 'manque';
   }
 
   function ouvrirMois() { app.currentScreen = 'portefeuille'; }

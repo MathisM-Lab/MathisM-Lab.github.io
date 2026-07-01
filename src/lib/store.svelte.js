@@ -170,7 +170,7 @@ function createAppState() {
       });
     },
     get moisCourantValide() {
-      return moisEstValide(enveloppes, transactions, calcMoisCourant(params.dateDebut));
+      return moisEstValide(enveloppes, transactions, calcMoisCourant(params.dateDebut), params.dateDebut);
     },
     get srri() {
       return calculerSRRI(enveloppes, prix, transactions, prixHebdo);

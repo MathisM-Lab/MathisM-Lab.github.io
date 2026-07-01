@@ -1,6 +1,8 @@
 // Agrégats de portefeuille + algorithme de rééquilibrage (2 passages).
 // `prixOf(actif)` renvoie le prix unitaire courant d'un actif.
 
+import { mvtPrevuAuMois } from './projection.js';
+
 export function estLivret(enveloppe) {
   return enveloppe.type === 'Livret A' || !enveloppe.actifs || enveloppe.actifs.length === 0;
 }
@@ -150,15 +152,21 @@ export function rebalance({ montantDisponible, fraisCourtage = 0.005, ordreMinim
 }
 
 // ---- Validation des mois ----
-// Un mois est "validé" si chaque enveloppe a au moins une transaction ce mois-là.
-export function enveloppesInvestiesAuMois(enveloppes, transactions, mois) {
+// Une enveloppe n'est "attendue" un mois donné que si le plan prévoit un
+// versement ce mois-là (palier actif > 0). Les enveloppes sans versement prévu
+// (ex. une assurance-vie alimentée ponctuellement) ne comptent pas.
+export function enveloppesInvestiesAuMois(enveloppes, transactions, mois, dateDebut) {
   const ids = new Set(
     transactions.filter((t) => (t.mois ?? null) === mois).map((t) => t.enveloppe)
   );
-  return enveloppes.map((e) => ({ enveloppe: e, investie: ids.has(e.id) }));
+  return enveloppes
+    .filter((e) => mvtPrevuAuMois(e, mois, dateDebut) > 0)
+    .map((e) => ({ enveloppe: e, investie: ids.has(e.id) }));
 }
 
-export function moisEstValide(enveloppes, transactions, mois) {
+// Un mois est "validé" si chaque enveloppe *attendue* ce mois-là a une transaction.
+// Un mois sans aucun versement prévu est considéré comme validé (rien à faire).
+export function moisEstValide(enveloppes, transactions, mois, dateDebut) {
   if (!enveloppes.length) return false;
-  return enveloppesInvestiesAuMois(enveloppes, transactions, mois).every((x) => x.investie);
+  return enveloppesInvestiesAuMois(enveloppes, transactions, mois, dateDebut).every((x) => x.investie);
 }
