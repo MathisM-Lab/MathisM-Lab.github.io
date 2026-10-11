@@ -8,7 +8,7 @@
 
   let { enveloppe = null, onClose } = $props();
 
-  const videActif = () => ({ id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, rendementAnnuelPct: '', prixDefaut: 0, sri: null, vev: '' });
+  const videActif = () => ({ id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, rendementAnnuelPct: '', prixDefaut: 0, sri: null, vev: '', deviseEtrangere: false });
   const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', montantMinAchat: 100, paliers: [], actifs: [] };
   // En édition, `enveloppe` est un proxy réactif Svelte -> $state.snapshot (structuredClone planterait).
   const source = untrack(() => enveloppe);
@@ -33,6 +33,9 @@
   let estPEA = $derived(form.type === 'PEA');
   // BoursoBank Vie : 0 frais sur versement, quel que soit le support -> pas de champ.
   let estAssuranceVie = $derived(form.type === 'Assurance-vie');
+  // Saxo Investor (Classic) : 0,08 % min 2 € + 0,25 % de change -> pas de champ,
+  // juste une case par actif pour signaler une devise étrangère.
+  let estCTO = $derived(form.type === 'CTO');
   let fraisLabel = 'Frais de courtage';
   let totalCible = $derived(form.actifs.reduce((s, a) => s + Number(a.ciblePct || 0), 0));
 
@@ -54,13 +57,13 @@
     }
     const estRdtValide = (v) => { const s = String(v ?? '').trim(); return s !== '' && Number.isFinite(Number(s)); };
     if (gereActifs) {
-      // Frais : barème fixe sur le PEA (seul le minimum d'achat est réglable),
-      // aucun frais sur versement en assurance-vie (BoursoBank Vie), champ
-      // manuel obligatoire pour les autres enveloppes à actifs (CTO, Crypto).
+      // Frais : barème fixe sur le PEA (seul le minimum d'achat est réglable)
+      // et sur le CTO (barème Saxo), aucun frais sur versement en assurance-vie
+      // (BoursoBank Vie), champ manuel obligatoire pour les autres (Crypto).
       if (estPEA) {
         const min = String(form.montantMinAchat ?? '').trim();
         if (min === '' || !Number.isFinite(Number(min)) || Number(min) < 0) return (err = 'Indique le montant minimum par achat.');
-      } else if (!estAssuranceVie) {
+      } else if (!estAssuranceVie && !estCTO) {
         const frais = String(form.fraisPct).trim();
         if (frais === '' || !Number.isFinite(Number(frais))) return (err = `Indique les ${fraisLabel.toLowerCase()}.`);
       }
@@ -148,6 +151,15 @@
         <span class="label">Frais sur versement</span>
         <p class="text-3" style="font-size:12px;margin:4px 0 0">Aucun frais chez BoursoBank Vie : 0 € sur chaque versement.</p>
       </div>
+    {:else if estCTO}
+      <div class="field">
+        <span class="label">Frais de courtage (Saxo Investor)</span>
+        <p class="text-3" style="font-size:12px;margin:4px 0 0">
+          Barème fixe : 0,08 % du montant, minimum 2 € par ordre. +0,25 % de change
+          pour un actif coté en devise étrangère (case à cocher sur l'actif concerné).
+          Calculés automatiquement, ajoutés à l'achat et retranchés à la vente.
+        </p>
+      </div>
     {:else}
       <div class="field">
         <label class="label" for="ef-frais">{fraisLabel} (%)</label>
@@ -186,6 +198,12 @@
             <span class="text-3">%</span>
           </div>
         </div>
+        {#if estCTO}
+          <label class="actif-row" style="margin-top:8px;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" bind:checked={form.actifs[i].deviseEtrangere} />
+            <span class="text-3" style="font-size:12px">Coté en devise étrangère (hors €) — +0,25 % de change</span>
+          </label>
+        {/if}
         {#if !form.actifs[i].ticker?.trim()}
           <div class="actif-row" style="margin-top:6px;gap:8px">
             <div class="sri-wrap">

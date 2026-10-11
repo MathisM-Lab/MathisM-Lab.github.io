@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { addTransaction } from '../lib/db.js';
   import { app } from '../lib/store.svelte.js';
-  import { estLivret, prixActif, fraisCourtagePEA } from '../lib/calc.js';
+  import { estLivret, prixActif, fraisCourtagePEA, fraisCourtageSaxoCTO } from '../lib/calc.js';
   import { moisToMonthInput, monthInputToMois } from '../lib/date.js';
   import { euros, pct } from '../lib/format.js';
   import Sheet from './Sheet.svelte';
@@ -27,13 +27,19 @@
   // Le montant saisi est HORS frais : l'app ajoute (achat) ou retranche (vente)
   // les frais de courtage pour obtenir le flux réel. Sur le PEA, barème fixe
   // BoursoBank ; sur l'assurance-vie (BoursoBank Vie), 0 frais sur versement ;
-  // sur les autres enveloppes à actifs (CTO, Crypto), % manuel de l'enveloppe.
+  // sur le CTO, barème fixe Saxo Investor ; sur les autres enveloppes à actifs
+  // (Crypto), % manuel de l'enveloppe.
   let estPEA = $derived(enveloppe?.type === 'PEA');
   let estAssuranceVie = $derived(enveloppe?.type === 'Assurance-vie');
+  let estCTO = $derived(enveloppe?.type === 'CTO');
   let minAchat = $derived(Number(enveloppe?.montantMinAchat) || 100);
-  let fraisPct = $derived(livret || estPEA || estAssuranceVie ? 0 : Number(enveloppe?.fraisPct) || 0);
+  let fraisPct = $derived(livret || estPEA || estAssuranceVie || estCTO ? 0 : Number(enveloppe?.fraisPct) || 0);
   let brut = $derived(Number(montant) || 0);
-  let fraisCalc = $derived(estPEA ? fraisCourtagePEA(brut) : { frais: brut * fraisPct / 100, fixe: false });
+  let fraisCalc = $derived(
+    estPEA ? fraisCourtagePEA(brut)
+    : estCTO ? fraisCourtageSaxoCTO(brut, actifSel?.deviseEtrangere)
+    : { frais: brut * fraisPct / 100 }
+  );
   let frais = $derived(livret ? 0 : fraisCalc.frais);
   let total = $derived(sens === 'vente' ? brut - frais : brut + frais);
   let sousMinimum = $derived(estPEA && sens === 'achat' && brut > 0 && brut < minAchat);
@@ -83,7 +89,10 @@
     const signe = sens === 'vente' ? -1 : 1;
     const actif = livret ? (enveloppe?.nom ?? '') : (actifs.find((a) => a.id === actifId)?.nom ?? '');
     // Flux réel = montant saisi (hors frais) ± frais de courtage.
-    const fr = livret ? 0 : (estPEA ? fraisCourtagePEA(m).frais : m * fraisPct / 100);
+    const fr = livret ? 0
+      : estPEA ? fraisCourtagePEA(m).frais
+      : estCTO ? fraisCourtageSaxoCTO(m, actifSel?.deviseEtrangere).frais
+      : m * fraisPct / 100;
     const reel = sens === 'vente' ? m - fr : m + fr;
     saving = true;
     try {
@@ -170,6 +179,10 @@
         {#if sousMinimum}
           <p class="neg" style="font-size:12px;margin:6px 0 0">Sous le minimum d'achat ETF ({euros(minAchat)}) imposé par l'appli BoursoBank — tu peux valider quand même.</p>
         {/if}
+      {:else if !livret && estCTO && brut > 0}
+        <p class="text-3" style="font-size:12px;margin:6px 0 0">
+          Frais (0,08 %, min 2 €{actifSel?.deviseEtrangere ? ' +0,25 % change' : ''}) : {euros(frais)} · {sens === 'vente' ? 'Total reçu' : 'Total payé'} : <strong style="color:var(--text)">{euros(total)}</strong>
+        </p>
       {:else if !livret && fraisPct > 0 && brut > 0}
         <p class="text-3" style="font-size:12px;margin:6px 0 0">
           Frais ({pct(fraisPct / 100)}) : {euros(frais)} · {sens === 'vente' ? 'Total reçu' : 'Total payé'} : <strong style="color:var(--text)">{euros(total)}</strong>

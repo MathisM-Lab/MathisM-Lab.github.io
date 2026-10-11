@@ -15,6 +15,15 @@ export function fraisCourtagePEA(montant) {
   return { frais: fixe ? 1.99 : montant * 0.005, fixe };
 }
 
+// Barème de courtage Saxo Investor (ETF, CTO, compte Classic) : 0,08 % du
+// montant avec un minimum de 2 € par ordre, + 0,25 % de frais de change si
+// l'actif cote dans une devise étrangère (hors €). Seuils fixes.
+export function fraisCourtageSaxoCTO(montant, deviseEtrangere = false) {
+  const courtage = Math.max(2, montant * 0.0008);
+  const change = deviseEtrangere ? montant * 0.0025 : 0;
+  return { frais: courtage + change, courtage, change };
+}
+
 export function prixActif(actif, prixMap) {
   // prixMap : ticker -> { prix }. Repli sur prixDefaut puis 0.
   const live = actif.ticker ? prixMap?.get?.(actif.ticker)?.prix : null;
