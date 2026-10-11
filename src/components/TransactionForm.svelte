@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { addTransaction } from '../lib/db.js';
   import { app } from '../lib/store.svelte.js';
-  import { estLivret, prixActif, fraisCourtagePEA, fraisCourtageSaxoCTO } from '../lib/calc.js';
+  import { estLivret, prixActif, fraisCourtagePEA, fraisCourtageSaxoCTO, minAchatEnveloppe } from '../lib/calc.js';
   import { moisToMonthInput, monthInputToMois } from '../lib/date.js';
   import { euros, pct } from '../lib/format.js';
   import Sheet from './Sheet.svelte';
@@ -32,7 +32,7 @@
   let estPEA = $derived(enveloppe?.type === 'PEA');
   let estAssuranceVie = $derived(enveloppe?.type === 'Assurance-vie');
   let estCTO = $derived(enveloppe?.type === 'CTO');
-  let minAchat = $derived(Number(enveloppe?.montantMinAchat) || 0);
+  let minAchat = $derived(enveloppe ? minAchatEnveloppe(enveloppe) : 0);
   let fraisPct = $derived(livret || estPEA || estAssuranceVie || estCTO ? 0 : Number(enveloppe?.fraisPct) || 0);
   let brut = $derived(Number(montant) || 0);
   let fraisCalc = $derived(

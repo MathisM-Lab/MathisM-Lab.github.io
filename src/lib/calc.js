@@ -2,6 +2,7 @@
 // `prixOf(actif)` renvoie le prix unitaire courant d'un actif.
 
 import { mvtPrevuAuMois } from './projection.js';
+import { MIN_ACHAT_DEFAUT } from './defaults.js';
 
 export function estLivret(enveloppe) {
   return enveloppe.type === 'Livret A' || !enveloppe.actifs || enveloppe.actifs.length === 0;
@@ -24,6 +25,14 @@ export function fraisCourtageSaxoCTO(montant, deviseEtrangere = false) {
   const courtage = Math.max(2, montant * 0.0008);
   const change = deviseEtrangere ? montant * 0.0025 : 0;
   return { frais: courtage + change, courtage, change };
+}
+
+// Montant minimum par achat d'une enveloppe : sa propre valeur enregistrée,
+// sinon le défaut par type (tant qu'elle n'a jamais été réenregistrée depuis
+// l'ajout de ce champ -> évite qu'une enveloppe non réouverte en Réglages
+// reste sans minimum).
+export function minAchatEnveloppe(enveloppe) {
+  return Number(enveloppe.montantMinAchat) || MIN_ACHAT_DEFAUT[enveloppe.type] || 0;
 }
 
 export function prixActif(actif, prixMap) {

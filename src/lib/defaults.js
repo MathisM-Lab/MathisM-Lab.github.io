@@ -42,3 +42,10 @@ export const TYPES_ENVELOPPE = ['PEA', 'CTO', 'Assurance-vie', 'Livret A', 'SCPI
 export function aDesActifs(type) {
   return type === 'PEA' || type === 'CTO' || type === 'Assurance-vie' || type === 'Crypto';
 }
+
+// Montant minimum par achat par défaut, selon le type (utilisé tant que
+// l'enveloppe n'a pas sa propre valeur enregistrée) : PEA = seuil ETF
+// BoursoBank · Assurance-vie = minimum par support BoursoBank Vie · Crypto =
+// ordre minimum usuel des plateformes · CTO = seuil anti-frais (le minimum de
+// 2 € Saxo reste sous ~1 % de l'ordre), pas imposé par le courtier.
+export const MIN_ACHAT_DEFAUT = { PEA: 100, 'Assurance-vie': 25, Crypto: 10, CTO: 200 };

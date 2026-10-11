@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { saveEnveloppe } from '../lib/db.js';
   import { app } from '../lib/store.svelte.js';
-  import { TYPES_ENVELOPPE, ENVELOPPE_PALETTE, aDesActifs } from '../lib/defaults.js';
+  import { TYPES_ENVELOPPE, ENVELOPPE_PALETTE, aDesActifs, MIN_ACHAT_DEFAUT } from '../lib/defaults.js';
   import Sheet from './Sheet.svelte';
   import Icon from './Icon.svelte';
 
@@ -20,12 +20,10 @@
       if (a.rendementAnnuelPct === '' || a.rendementAnnuelPct == null) a.rendementAnnuelPct = initial.rendementAnnuelPct;
     }
   }
-  // Migration douce : minimum d'achat par défaut selon l'enveloppe, pour celles
-  // créées avant ce champ (PEA : seuil ETF BoursoBank · Assurance-vie : minimum
-  // par support BoursoBank Vie · Crypto : ordre minimum usuel des plateformes ·
-  // CTO : pas un minimum imposé par Saxo, mais un seuil pour garder le 2 €
-  // minimum de frais sous ~1 % de l'ordre -> évite les petits ordres coûteux).
-  const MIN_ACHAT_DEFAUT = { PEA: 100, 'Assurance-vie': 25, Crypto: 10, CTO: 200 };
+  // Migration douce (affichage uniquement) : préremplit le minimum d'achat par
+  // défaut pour les enveloppes créées avant ce champ. La vraie protection
+  // contre une enveloppe jamais réenregistrée est le repli sur MIN_ACHAT_DEFAUT
+  // partout où montantMinAchat est lu (Rebalance, TransactionForm).
   if (source && MIN_ACHAT_DEFAUT[initial.type] != null && (initial.montantMinAchat === '' || initial.montantMinAchat == null)) {
     initial.montantMinAchat = MIN_ACHAT_DEFAUT[initial.type];
   }

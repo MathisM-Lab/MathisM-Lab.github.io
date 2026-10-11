@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { app } from '../lib/store.svelte.js';
   import { euros, num, pct, horodatageRelatif } from '../lib/format.js';
-  import { actifsAgreges, rebalanceGlobal, fraisCourtageLigne } from '../lib/calc.js';
+  import { actifsAgreges, rebalanceGlobal, fraisCourtageLigne, minAchatEnveloppe } from '../lib/calc.js';
   import { addTransaction } from '../lib/db.js';
   import Icon from '../components/Icon.svelte';
 
@@ -22,7 +22,7 @@
     const out = [];
     for (const env of enveloppesInvest) {
       const poidsEnv = (Number(env.poidsCible) || 0) / 100;
-      const minAchat = Number(env.montantMinAchat) || 0;
+      const minAchat = minAchatEnveloppe(env);
       for (const a of actifsAgreges(env, app.transactions, app.prix)) {
         out.push({
           id: a.id,
