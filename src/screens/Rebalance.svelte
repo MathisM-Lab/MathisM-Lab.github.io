@@ -33,6 +33,7 @@
           ticker: a.ticker,
           prix: a.prix,
           valeurActuelle: a.valeur,
+          ciblePctEnv: a.ciblePct ?? 0,
           cibleGlobale: poidsEnv * ((a.ciblePct ?? 0) / 100),
           minAchat,
           frais: (montant) => fraisCourtageLigne(env, a, montant)
@@ -114,12 +115,12 @@
         </button>
       </div>
       {#each enveloppesInvest as env (env.id)}
-        <div class="env-label" style="--c:{env.couleur}">{env.nom}</div>
+        <div class="env-label" style="--c:{env.couleur}">{env.nom} · {Number(env.poidsCible) || 0} %</div>
         {#each lignesBrutes.filter((l) => l.enveloppeId === env.id) as a (a.id)}
           {@const mp = a.ticker ? app.prix.get(a.ticker) : null}
           <div class="prow">
             <div style="min-width:0">
-              <div class="prow-nom">{a.nom}</div>
+              <div class="prow-nom">{a.nom} · {a.ciblePctEnv} %</div>
               <div class="prow-meta text-3">
                 {#if !a.ticker}sans ticker · prix par défaut
                 {:else if mp?.ok === false}cours indisponible · prix par défaut
@@ -132,8 +133,6 @@
         {/each}
       {/each}
     </div>
-
-    <p class="text-3" style="font-size:12px">Frais et minimum d'achat : appliqués automatiquement depuis les paramètres de chaque enveloppe (Réglages).</p>
 
     <button class="btn btn-primary btn-block btn-lg" onclick={calculer}>Calculer</button>
 
