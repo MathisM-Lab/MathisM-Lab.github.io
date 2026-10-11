@@ -194,7 +194,7 @@
                   {#if t.parts != null}· {num(t.parts)} parts{/if}
                 </div>
               </div>
-              <div class="amount jr-montant">{euros(t.montant)}</div>
+              <div class="amount jr-montant">{euros(t.montant)} <span class="text-3" style="font-size:11px;font-weight:400">(FC)</span></div>
               <button class="icon-btn jr-del" onclick={() => supprimer(t.id)} aria-label="Supprimer">
                 <Icon name="trash" size={16} />
               </button>
