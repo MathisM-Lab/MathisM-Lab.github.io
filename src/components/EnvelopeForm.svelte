@@ -9,7 +9,7 @@
   let { enveloppe = null, onClose } = $props();
 
   const videActif = () => ({ id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, rendementAnnuelPct: '', prixDefaut: 0, sri: null, vev: '' });
-  const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', paliers: [], actifs: [] };
+  const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', montantMinAchat: 100, paliers: [], actifs: [] };
   // En édition, `enveloppe` est un proxy réactif Svelte -> $state.snapshot (structuredClone planterait).
   const source = untrack(() => enveloppe);
   const initial = source ? $state.snapshot(source) : structuredClone(vide);
@@ -20,11 +20,17 @@
       if (a.rendementAnnuelPct === '' || a.rendementAnnuelPct == null) a.rendementAnnuelPct = initial.rendementAnnuelPct;
     }
   }
+  // Migration douce : un PEA créé avant le barème de courtage fixe n'a pas de
+  // montant minimum d'achat -> on applique le défaut (100 €, seuil ETF BoursoBank).
+  if (source && initial.type === 'PEA' && (initial.montantMinAchat === '' || initial.montantMinAchat == null)) {
+    initial.montantMinAchat = 100;
+  }
   let form = $state(initial);
   let err = $state('');
   let saving = $state(false);
 
   let gereActifs = $derived(aDesActifs(form.type));
+  let estPEA = $derived(form.type === 'PEA');
   // En assurance-vie, les frais s'appliquent au versement (pas de courtage).
   let fraisLabel = $derived(form.type === 'Assurance-vie' ? 'Frais sur versement' : 'Frais de courtage');
   let totalCible = $derived(form.actifs.reduce((s, a) => s + Number(a.ciblePct || 0), 0));
@@ -47,9 +53,15 @@
     }
     const estRdtValide = (v) => { const s = String(v ?? '').trim(); return s !== '' && Number.isFinite(Number(s)); };
     if (gereActifs) {
-      // Frais et actifs cibles : demandés pour ce type, donc obligatoires.
-      const frais = String(form.fraisPct).trim();
-      if (frais === '' || !Number.isFinite(Number(frais))) return (err = `Indique les ${fraisLabel.toLowerCase()}.`);
+      // Frais : barème fixe sur le PEA (seul le minimum d'achat est réglable),
+      // champ manuel obligatoire pour les autres enveloppes à actifs.
+      if (estPEA) {
+        const min = String(form.montantMinAchat ?? '').trim();
+        if (min === '' || !Number.isFinite(Number(min)) || Number(min) < 0) return (err = 'Indique le montant minimum par achat.');
+      } else {
+        const frais = String(form.fraisPct).trim();
+        if (frais === '' || !Number.isFinite(Number(frais))) return (err = `Indique les ${fraisLabel.toLowerCase()}.`);
+      }
       if (form.actifs.length === 0) return (err = 'Ajoute au moins un actif cible.');
       if (form.actifs.some((a) => !a.nom.trim())) return (err = 'Chaque actif doit avoir un nom.');
       // Rendement annuel : demandé par actif pour ce type.
@@ -116,11 +128,26 @@
   {/if}
 
   {#if gereActifs}
-    <div class="field">
-      <label class="label" for="ef-frais">{fraisLabel} (%)</label>
-      <input class="input" id="ef-frais" type="number" step="0.01" min="0" bind:value={form.fraisPct} placeholder="Ex. 0,3" />
-      <p class="text-3" style="font-size:12px;margin:6px 0 0">Ajoutés automatiquement au montant saisi lors d'un achat (et retranchés à une vente).</p>
-    </div>
+    {#if estPEA}
+      <div class="field">
+        <span class="label">Frais de courtage (BoursoBank)</span>
+        <p class="text-3" style="font-size:12px;margin:4px 0 0">
+          Barème fixe : 0,50 % sous 398 € et au-delà de 500 €, 1,99 € entre les deux.
+          Calculés automatiquement, ajoutés à l'achat et retranchés à la vente.
+        </p>
+      </div>
+      <div class="field">
+        <label class="label" for="ef-min-achat">Montant minimum par achat (€)</label>
+        <input class="input" id="ef-min-achat" type="number" step="1" min="0" bind:value={form.montantMinAchat} placeholder="Ex. 100" />
+        <p class="text-3" style="font-size:12px;margin:6px 0 0">Un avertissement s'affiche en-dessous (seuil ETF imposé par l'appli BoursoBank), sans bloquer la saisie.</p>
+      </div>
+    {:else}
+      <div class="field">
+        <label class="label" for="ef-frais">{fraisLabel} (%)</label>
+        <input class="input" id="ef-frais" type="number" step="0.01" min="0" bind:value={form.fraisPct} placeholder="Ex. 0,3" />
+        <p class="text-3" style="font-size:12px;margin:6px 0 0">Ajoutés automatiquement au montant saisi lors d'un achat (et retranchés à une vente).</p>
+      </div>
+    {/if}
   {/if}
 
   {#if gereActifs}

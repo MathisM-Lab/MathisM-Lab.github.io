@@ -7,6 +7,14 @@ export function estLivret(enveloppe) {
   return enveloppe.type === 'Livret A' || !enveloppe.actifs || enveloppe.actifs.length === 0;
 }
 
+// Barème de courtage BoursoBank (ETF, PEA) : 0,50 % (plafond légal) appliqué
+// d'office sous 398 € et au-delà de 500 € ; palier 1,99 € fixe entre les deux
+// (le plus rentable). Seuils fixes, non paramétrables.
+export function fraisCourtagePEA(montant) {
+  const fixe = montant >= 398 && montant <= 500;
+  return { frais: fixe ? 1.99 : montant * 0.005, fixe };
+}
+
 export function prixActif(actif, prixMap) {
   // prixMap : ticker -> { prix }. Repli sur prixDefaut puis 0.
   const live = actif.ticker ? prixMap?.get?.(actif.ticker)?.prix : null;
