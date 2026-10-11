@@ -22,8 +22,10 @@
   }
   // Migration douce : minimum d'achat par défaut selon l'enveloppe, pour celles
   // créées avant ce champ (PEA : seuil ETF BoursoBank · Assurance-vie : minimum
-  // par support BoursoBank Vie · Crypto : ordre minimum usuel des plateformes).
-  const MIN_ACHAT_DEFAUT = { PEA: 100, 'Assurance-vie': 25, Crypto: 10 };
+  // par support BoursoBank Vie · Crypto : ordre minimum usuel des plateformes ·
+  // CTO : pas un minimum imposé par Saxo, mais un seuil pour garder le 2 €
+  // minimum de frais sous ~1 % de l'ordre -> évite les petits ordres coûteux).
+  const MIN_ACHAT_DEFAUT = { PEA: 100, 'Assurance-vie': 25, Crypto: 10, CTO: 200 };
   if (source && MIN_ACHAT_DEFAUT[initial.type] != null && (initial.montantMinAchat === '' || initial.montantMinAchat == null)) {
     initial.montantMinAchat = MIN_ACHAT_DEFAUT[initial.type];
   }
@@ -36,8 +38,7 @@
   // BoursoBank Vie : 0 frais sur versement, quel que soit le support -> pas de champ.
   let estAssuranceVie = $derived(form.type === 'Assurance-vie');
   // Saxo Investor (Classic) : 0,08 % min 2 € + 0,25 % de change -> pas de champ,
-  // juste une case par actif pour signaler une devise étrangère. Aucun minimum
-  // d'achat chez Saxo, donc pas de champ non plus pour le CTO.
+  // juste une case par actif pour signaler une devise étrangère.
   let estCTO = $derived(form.type === 'CTO');
   let fraisLabel = 'Frais de courtage';
   let totalCible = $derived(form.actifs.reduce((s, a) => s + Number(a.ciblePct || 0), 0));
@@ -185,8 +186,12 @@
           Barème fixe : 0,08 % du montant, minimum 2 € par ordre. +0,25 % de change
           pour un actif coté en devise étrangère (case à cocher sur l'actif concerné).
           Calculés automatiquement, ajoutés à l'achat et retranchés à la vente.
-          Aucun montant minimum par ordre chez Saxo.
         </p>
+      </div>
+      <div class="field">
+        <label class="label" for="ef-min-achat">Montant minimum par achat (€)</label>
+        <input class="input" id="ef-min-achat" type="number" step="1" min="0" bind:value={form.montantMinAchat} placeholder="Ex. 200" />
+        <p class="text-3" style="font-size:12px;margin:6px 0 0">Saxo n'impose aucun minimum, mais sous ce seuil le minimum de 2 € de frais pèse trop lourd en % — le rééquilibrage reporte alors l'achat au mois suivant. Avertissement non bloquant.</p>
       </div>
     {:else}
       <div class="field">

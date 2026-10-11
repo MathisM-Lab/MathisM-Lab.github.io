@@ -32,7 +32,7 @@
   let estPEA = $derived(enveloppe?.type === 'PEA');
   let estAssuranceVie = $derived(enveloppe?.type === 'Assurance-vie');
   let estCTO = $derived(enveloppe?.type === 'CTO');
-  let minAchat = $derived(Number(enveloppe?.montantMinAchat) || 100);
+  let minAchat = $derived(Number(enveloppe?.montantMinAchat) || 0);
   let fraisPct = $derived(livret || estPEA || estAssuranceVie || estCTO ? 0 : Number(enveloppe?.fraisPct) || 0);
   let brut = $derived(Number(montant) || 0);
   let fraisCalc = $derived(
@@ -42,7 +42,7 @@
   );
   let frais = $derived(livret ? 0 : fraisCalc.frais);
   let total = $derived(sens === 'vente' ? brut - frais : brut + frais);
-  let sousMinimum = $derived(estPEA && sens === 'achat' && brut > 0 && brut < minAchat);
+  let sousMinimum = $derived(sens === 'achat' && brut > 0 && minAchat > 0 && brut < minAchat);
 
   $effect(() => {
     if (!livret && actifs.length && !actifs.some((a) => a.id === actifId)) actifId = actifs[0].id;
@@ -176,9 +176,6 @@
         <p class="text-3" style="font-size:12px;margin:6px 0 0">
           Frais ({fraisCalc.fixe ? '1,99 € fixe' : pct(0.005)}) : {euros(frais)} · {sens === 'vente' ? 'Total reçu' : 'Total payé'} : <strong style="color:var(--text)">{euros(total)}</strong>
         </p>
-        {#if sousMinimum}
-          <p class="neg" style="font-size:12px;margin:6px 0 0">Sous le minimum d'achat ETF ({euros(minAchat)}) imposé par l'appli BoursoBank — tu peux valider quand même.</p>
-        {/if}
       {:else if !livret && estCTO && brut > 0}
         <p class="text-3" style="font-size:12px;margin:6px 0 0">
           Frais (0,08 %, min 2 €{actifSel?.deviseEtrangere ? ' +0,25 % change' : ''}) : {euros(frais)} · {sens === 'vente' ? 'Total reçu' : 'Total payé'} : <strong style="color:var(--text)">{euros(total)}</strong>
@@ -189,6 +186,9 @@
         </p>
       {:else if !livret && brut > 0}
         <p class="text-3" style="font-size:12px;margin:6px 0 0">Aucun frais réglé pour cette enveloppe.</p>
+      {/if}
+      {#if sousMinimum}
+        <p class="neg" style="font-size:12px;margin:6px 0 0">Sous le minimum d'achat habituel de cette enveloppe ({euros(minAchat)}) — tu peux valider quand même.</p>
       {/if}
     </div>
 
