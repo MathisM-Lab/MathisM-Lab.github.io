@@ -108,7 +108,7 @@
     <!-- Prix des parts (automatique), groupés par enveloppe -->
     <div class="card card-flush">
       <div class="between" style="padding:16px 18px 6px">
-        <div class="eyebrow">Prix des parts (auto)</div>
+        <div class="eyebrow">Prix des parts (auto, HF)</div>
         <button class="icon-btn" style="border:0;background:transparent;width:auto;height:auto;color:var(--accent);font-weight:600;font-size:13px;gap:6px"
                 onclick={() => app.rafraichirPrix()}>
           <Icon name="refresh" size={15} /> {app.refreshingPrices ? '…' : 'Actualiser'}
@@ -146,11 +146,11 @@
               <div>
                 <div class="res-env" style="--c:{brute?.enveloppeCouleur}">{brute?.enveloppeNom}</div>
                 <div class="res-nom">{l.nom}</div>
-                <div class="text-3" style="font-size:12px;margin-top:2px">Cible {pct(l.cibleGlobale, { digits: 1 })} du total · {euros(l.prix)}/part</div>
+                <div class="text-3" style="font-size:12px;margin-top:2px">Cible {pct(l.cibleGlobale, { digits: 1 })} du total · {euros(l.prix)}/part (HF)</div>
               </div>
               <div style="text-align:right">
                 <div class="res-parts">{l.parts > 0 ? `${num(l.parts)} parts` : '—'}</div>
-                <div class="amount text-2" style="font-size:13px">{euros(l.cout)}</div>
+                <div class="amount text-2" style="font-size:13px">{euros(l.cout)} <span class="text-3" style="font-size:11px;font-weight:400">(FC)</span></div>
               </div>
             </div>
           </div>
@@ -158,7 +158,7 @@
 
         <div class="card">
           <div class="rows">
-            <div class="row"><span class="k">Total dépensé</span><span class="v">{euros(resultat.totalDepense)}</span></div>
+            <div class="row"><span class="k">Total dépensé (FC)</span><span class="v">{euros(resultat.totalDepense)}</span></div>
             <div class="row"><span class="k">Reste en espèces</span><span class="v">{euros(resultat.resteEspeces)}</span></div>
           </div>
         </div>
