@@ -31,8 +31,9 @@
 
   let gereActifs = $derived(aDesActifs(form.type));
   let estPEA = $derived(form.type === 'PEA');
-  // En assurance-vie, les frais s'appliquent au versement (pas de courtage).
-  let fraisLabel = $derived(form.type === 'Assurance-vie' ? 'Frais sur versement' : 'Frais de courtage');
+  // BoursoBank Vie : 0 frais sur versement, quel que soit le support -> pas de champ.
+  let estAssuranceVie = $derived(form.type === 'Assurance-vie');
+  let fraisLabel = 'Frais de courtage';
   let totalCible = $derived(form.actifs.reduce((s, a) => s + Number(a.ciblePct || 0), 0));
 
   function ajouterActif() {
@@ -54,11 +55,12 @@
     const estRdtValide = (v) => { const s = String(v ?? '').trim(); return s !== '' && Number.isFinite(Number(s)); };
     if (gereActifs) {
       // Frais : barème fixe sur le PEA (seul le minimum d'achat est réglable),
-      // champ manuel obligatoire pour les autres enveloppes à actifs.
+      // aucun frais sur versement en assurance-vie (BoursoBank Vie), champ
+      // manuel obligatoire pour les autres enveloppes à actifs (CTO, Crypto).
       if (estPEA) {
         const min = String(form.montantMinAchat ?? '').trim();
         if (min === '' || !Number.isFinite(Number(min)) || Number(min) < 0) return (err = 'Indique le montant minimum par achat.');
-      } else {
+      } else if (!estAssuranceVie) {
         const frais = String(form.fraisPct).trim();
         if (frais === '' || !Number.isFinite(Number(frais))) return (err = `Indique les ${fraisLabel.toLowerCase()}.`);
       }
@@ -140,6 +142,11 @@
         <label class="label" for="ef-min-achat">Montant minimum par achat (€)</label>
         <input class="input" id="ef-min-achat" type="number" step="1" min="0" bind:value={form.montantMinAchat} placeholder="Ex. 100" />
         <p class="text-3" style="font-size:12px;margin:6px 0 0">Un avertissement s'affiche en-dessous (seuil ETF imposé par l'appli BoursoBank), sans bloquer la saisie.</p>
+      </div>
+    {:else if estAssuranceVie}
+      <div class="field">
+        <span class="label">Frais sur versement</span>
+        <p class="text-3" style="font-size:12px;margin:4px 0 0">Aucun frais chez BoursoBank Vie : 0 € sur chaque versement.</p>
       </div>
     {:else}
       <div class="field">

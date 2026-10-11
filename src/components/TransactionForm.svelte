@@ -26,10 +26,12 @@
 
   // Le montant saisi est HORS frais : l'app ajoute (achat) ou retranche (vente)
   // les frais de courtage pour obtenir le flux réel. Sur le PEA, barème fixe
-  // BoursoBank ; sur les autres enveloppes à actifs, % manuel de l'enveloppe.
+  // BoursoBank ; sur l'assurance-vie (BoursoBank Vie), 0 frais sur versement ;
+  // sur les autres enveloppes à actifs (CTO, Crypto), % manuel de l'enveloppe.
   let estPEA = $derived(enveloppe?.type === 'PEA');
+  let estAssuranceVie = $derived(enveloppe?.type === 'Assurance-vie');
   let minAchat = $derived(Number(enveloppe?.montantMinAchat) || 100);
-  let fraisPct = $derived(livret || estPEA ? 0 : Number(enveloppe?.fraisPct) || 0);
+  let fraisPct = $derived(livret || estPEA || estAssuranceVie ? 0 : Number(enveloppe?.fraisPct) || 0);
   let brut = $derived(Number(montant) || 0);
   let fraisCalc = $derived(estPEA ? fraisCourtagePEA(brut) : { frais: brut * fraisPct / 100, fixe: false });
   let frais = $derived(livret ? 0 : fraisCalc.frais);
