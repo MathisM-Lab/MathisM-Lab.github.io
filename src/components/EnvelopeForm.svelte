@@ -9,7 +9,7 @@
   let { enveloppe = null, onClose } = $props();
 
   const videActif = () => ({ id: crypto.randomUUID(), nom: '', ticker: '', ciblePct: 0, rendementAnnuelPct: '', prixDefaut: 0, sri: null, vev: '', deviseEtrangere: false });
-  const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', montantMinAchat: 100, paliers: [], actifs: [] };
+  const vide = { nom: '', type: 'PEA', couleur: ENVELOPPE_PALETTE[0], rendementAnnuelPct: '', fraisPct: '', montantMinAchat: 100, poidsCible: '', paliers: [], actifs: [] };
   // En édition, `enveloppe` est un proxy réactif Svelte -> $state.snapshot (structuredClone planterait).
   const source = untrack(() => enveloppe);
   const initial = source ? $state.snapshot(source) : structuredClone(vide);
@@ -20,10 +20,12 @@
       if (a.rendementAnnuelPct === '' || a.rendementAnnuelPct == null) a.rendementAnnuelPct = initial.rendementAnnuelPct;
     }
   }
-  // Migration douce : un PEA créé avant le barème de courtage fixe n'a pas de
-  // montant minimum d'achat -> on applique le défaut (100 €, seuil ETF BoursoBank).
-  if (source && initial.type === 'PEA' && (initial.montantMinAchat === '' || initial.montantMinAchat == null)) {
-    initial.montantMinAchat = 100;
+  // Migration douce : minimum d'achat par défaut selon l'enveloppe, pour celles
+  // créées avant ce champ (PEA : seuil ETF BoursoBank · Assurance-vie : minimum
+  // par support BoursoBank Vie · Crypto : ordre minimum usuel des plateformes).
+  const MIN_ACHAT_DEFAUT = { PEA: 100, 'Assurance-vie': 25, Crypto: 10 };
+  if (source && MIN_ACHAT_DEFAUT[initial.type] != null && (initial.montantMinAchat === '' || initial.montantMinAchat == null)) {
+    initial.montantMinAchat = MIN_ACHAT_DEFAUT[initial.type];
   }
   let form = $state(initial);
   let err = $state('');
@@ -34,10 +36,21 @@
   // BoursoBank Vie : 0 frais sur versement, quel que soit le support -> pas de champ.
   let estAssuranceVie = $derived(form.type === 'Assurance-vie');
   // Saxo Investor (Classic) : 0,08 % min 2 € + 0,25 % de change -> pas de champ,
-  // juste une case par actif pour signaler une devise étrangère.
+  // juste une case par actif pour signaler une devise étrangère. Aucun minimum
+  // d'achat chez Saxo, donc pas de champ non plus pour le CTO.
   let estCTO = $derived(form.type === 'CTO');
   let fraisLabel = 'Frais de courtage';
   let totalCible = $derived(form.actifs.reduce((s, a) => s + Number(a.ciblePct || 0), 0));
+
+  // Poids cible de cette enveloppe dans le patrimoine total (pour le
+  // rééquilibrage global) -> simple avertissement si la somme entre toutes les
+  // enveloppes à actifs ne fait pas 100 %, rien de bloquant.
+  let sommePoidsAutres = $derived(
+    app.enveloppes
+      .filter((e) => aDesActifs(e.type) && e.id !== form.id)
+      .reduce((s, e) => s + (Number(e.poidsCible) || 0), 0)
+  );
+  let sommePoidsTotal = $derived(sommePoidsAutres + (Number(form.poidsCible) || 0));
 
   function ajouterActif() {
     form.actifs = [...form.actifs, videActif()];
@@ -133,6 +146,15 @@
   {/if}
 
   {#if gereActifs}
+    <div class="field">
+      <label class="label" for="ef-poids">Poids cible dans le patrimoine total (%)</label>
+      <input class="input" id="ef-poids" type="number" step="1" min="0" max="100" bind:value={form.poidsCible} placeholder="Ex. 50" />
+      <p class="text-3" style="font-size:12px;margin:6px 0 0">
+        Sert au rééquilibrage global (toutes enveloppes confondues).
+        Total actuel entre enveloppes : {sommePoidsTotal} %{#if Math.abs(sommePoidsTotal - 100) > 0.01} (vise 100 %){/if}
+      </p>
+    </div>
+
     {#if estPEA}
       <div class="field">
         <span class="label">Frais de courtage (BoursoBank)</span>
@@ -151,6 +173,11 @@
         <span class="label">Frais sur versement</span>
         <p class="text-3" style="font-size:12px;margin:4px 0 0">Aucun frais chez BoursoBank Vie : 0 € sur chaque versement.</p>
       </div>
+      <div class="field">
+        <label class="label" for="ef-min-achat">Montant minimum par achat (€)</label>
+        <input class="input" id="ef-min-achat" type="number" step="1" min="0" bind:value={form.montantMinAchat} placeholder="Ex. 25" />
+        <p class="text-3" style="font-size:12px;margin:6px 0 0">Avertissement non bloquant (minimum par support chez BoursoBank Vie).</p>
+      </div>
     {:else if estCTO}
       <div class="field">
         <span class="label">Frais de courtage (Saxo Investor)</span>
@@ -158,6 +185,7 @@
           Barème fixe : 0,08 % du montant, minimum 2 € par ordre. +0,25 % de change
           pour un actif coté en devise étrangère (case à cocher sur l'actif concerné).
           Calculés automatiquement, ajoutés à l'achat et retranchés à la vente.
+          Aucun montant minimum par ordre chez Saxo.
         </p>
       </div>
     {:else}
@@ -165,6 +193,11 @@
         <label class="label" for="ef-frais">{fraisLabel} (%)</label>
         <input class="input" id="ef-frais" type="number" step="0.01" min="0" bind:value={form.fraisPct} placeholder="Ex. 0,3" />
         <p class="text-3" style="font-size:12px;margin:6px 0 0">Ajoutés automatiquement au montant saisi lors d'un achat (et retranchés à une vente).</p>
+      </div>
+      <div class="field">
+        <label class="label" for="ef-min-achat">Montant minimum par achat (€)</label>
+        <input class="input" id="ef-min-achat" type="number" step="1" min="0" bind:value={form.montantMinAchat} placeholder="Ex. 10" />
+        <p class="text-3" style="font-size:12px;margin:6px 0 0">Avertissement non bloquant, à ajuster selon ta plateforme.</p>
       </div>
     {/if}
   {/if}

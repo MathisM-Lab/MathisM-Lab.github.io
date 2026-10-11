@@ -1,53 +1,64 @@
 <script>
   import { onMount } from 'svelte';
   import { app } from '../lib/store.svelte.js';
-  import { euros, num, horodatageRelatif } from '../lib/format.js';
-  import { actifsAgreges, rebalance } from '../lib/calc.js';
-  import { setParam, addTransaction } from '../lib/db.js';
+  import { euros, num, pct, horodatageRelatif } from '../lib/format.js';
+  import { actifsAgreges, rebalanceGlobal, fraisCourtageLigne } from '../lib/calc.js';
+  import { addTransaction } from '../lib/db.js';
   import Icon from '../components/Icon.svelte';
 
-  let investables = $derived(app.enveloppes.filter((e) => e.actifs?.length > 0));
-  let envId = $state(null);
-  $effect(() => { if (envId == null && investables.length) envId = investables[0].id; });
-  let env = $derived(app.enveloppes.find((e) => e.id === envId));
+  onMount(() => { app.rafraichirPrix(); });
+
+  // Toutes les enveloppes à actifs, tous types confondus (PEA, CTO, Assurance-vie,
+  // Crypto…) participent au même calcul global — plus de sous-page par enveloppe.
+  let enveloppesInvest = $derived(app.enveloppes.filter((e) => e.actifs?.length > 0));
+
+  let sommePoids = $derived(enveloppesInvest.reduce((s, e) => s + (Number(e.poidsCible) || 0), 0));
+  let poidsOk = $derived(Math.abs(sommePoids - 100) <= 0.5);
+
+  // Liste à plat de toutes les lignes (actif + enveloppe propriétaire), avec la
+  // cible globale (poids de l'enveloppe × cible de l'actif dans l'enveloppe) et
+  // les frais/minimum propres à CETTE enveloppe (barème réel, cf. calc.js).
+  let lignesBrutes = $derived.by(() => {
+    const out = [];
+    for (const env of enveloppesInvest) {
+      const poidsEnv = (Number(env.poidsCible) || 0) / 100;
+      const minAchat = Number(env.montantMinAchat) || 0;
+      for (const a of actifsAgreges(env, app.transactions, app.prix)) {
+        out.push({
+          id: a.id,
+          enveloppeId: env.id,
+          enveloppeNom: env.nom,
+          enveloppeCouleur: env.couleur,
+          nom: a.nom,
+          ticker: a.ticker,
+          prix: a.prix,
+          valeurActuelle: a.valeur,
+          cibleGlobale: poidsEnv * ((a.ciblePct ?? 0) / 100),
+          minAchat,
+          frais: (montant) => fraisCourtageLigne(env, a, montant)
+        });
+      }
+    }
+    return out;
+  });
+  let ligneParId = $derived(new Map(lignesBrutes.map((l) => [l.id, l])));
 
   let montant = $state('');
   let resultat = $state(null);
   let enregistrement = $state(false);
 
-  onMount(() => { app.rafraichirPrix(); });
-
-  let positions = $derived(env ? actifsAgreges(env, app.transactions, app.prix) : []);
-
-  // Paramètres de calcul (utilisés uniquement ici)
-  async function maj(cle, valeur) { await setParam(cle, valeur); await app.reload(); }
-  let fraisPct = $derived((app.params.fraisCourtage ?? 0.005) * 100);
-  async function majFrais(v) { const n = Number(String(v).replace(',', '.')); if (Number.isFinite(n)) await maj('fraisCourtage', n / 100); }
-  async function majOrdreMin(v) { const n = Number(String(v).replace(',', '.')); if (Number.isFinite(n)) await maj('ordreMinimum', n); }
-
   function calculer() {
     const m = Number(montant);
-    if (!Number.isFinite(m) || m <= 0 || !env) { resultat = null; return; }
-    const actifs = positions.map((a) => ({
-      id: a.id,
-      nom: a.nom,
-      prix: a.prix,
-      cible: (a.ciblePct ?? 0) / 100,
-      valeurActuelle: a.partsTotales * a.prix
-    }));
-    resultat = rebalance({
-      montantDisponible: m,
-      fraisCourtage: app.params.fraisCourtage ?? 0.005,
-      ordreMinimum: app.params.ordreMinimum ?? 200,
-      actifs
-    });
+    if (!Number.isFinite(m) || m <= 0 || lignesBrutes.length === 0) { resultat = null; return; }
+    resultat = rebalanceGlobal({ montantDisponible: m, lignes: lignesBrutes });
   }
 
-  // Enregistre les achats calculés (parts > 0) comme transactions sur l'enveloppe
-  // courante, puis bascule sur le Portefeuille. Les montants reprennent exactement
-  // ceux affichés : hors frais = parts × prix, frais = coût affiché − hors frais.
+  // Enregistre les achats calculés (parts > 0) comme transactions, sur l'enveloppe
+  // propriétaire de chaque ligne (potentiellement plusieurs enveloppes à la fois),
+  // puis bascule sur le Portefeuille. Montants repris tels qu'affichés : hors
+  // frais = parts × prix, frais = coût affiché − hors frais.
   async function implementer() {
-    if (!resultat || !env || enregistrement) return;
+    if (!resultat || enregistrement) return;
     const lignes = resultat.lignes.filter((l) => l.parts > 0);
     if (lignes.length === 0) return;
     enregistrement = true;
@@ -59,7 +70,7 @@
           mois,
           actif: l.nom,
           actifId: l.id,
-          enveloppe: env.id,
+          enveloppe: l.enveloppeId,
           parts: l.parts,
           montant: l.cout,
           montantHorsFrais,
@@ -67,27 +78,23 @@
         });
       }
       await app.reload();
-      app.portefeuilleEnv = env.id;
       app.currentScreen = 'portefeuille';
     } finally {
       enregistrement = false;
     }
   }
-
 </script>
 
 <div class="screen">
-  <div class="screen-head"><h1>Rééquilibrage{env ? ` ${env.nom}` : ''}</h1></div>
+  <div class="screen-head"><h1>Rééquilibrage</h1></div>
 
-  {#if investables.length === 0}
+  {#if enveloppesInvest.length === 0}
     <div class="card"><p class="empty">Aucune enveloppe avec des actifs et cibles. Configure un PEA ou un CTO dans Réglages.</p></div>
   {:else}
-    {#if investables.length > 1}
-      <div class="seg" style="align-self:flex-start">
-        {#each investables as e}
-          <button class:on={e.id === envId} onclick={() => { envId = e.id; resultat = null; }}>{e.nom}</button>
-        {/each}
-      </div>
+    {#if sommePoids === 0}
+      <div class="card"><p class="empty">Règle d'abord le « Poids cible dans le patrimoine total » de chaque enveloppe dans Réglages (ex. PEA 50 %, CTO 30 %, Assurance-vie 20 %) pour activer le calcul.</p></div>
+    {:else if !poidsOk}
+      <p class="text-3" style="font-size:12.5px">Poids cibles entre enveloppes : {sommePoids} % (vise 100 % — réglable dans Réglages).</p>
     {/if}
 
     <!-- Montant -->
@@ -97,7 +104,7 @@
              bind:value={montant} placeholder="0 €" />
     </div>
 
-    <!-- Prix des parts (automatique) -->
+    <!-- Prix des parts (automatique), groupés par enveloppe -->
     <div class="card card-flush">
       <div class="between" style="padding:16px 18px 6px">
         <div class="eyebrow">Prix des parts (auto)</div>
@@ -106,39 +113,27 @@
           <Icon name="refresh" size={15} /> {app.refreshingPrices ? '…' : 'Actualiser'}
         </button>
       </div>
-      {#each positions as a (a.id)}
-        {@const mp = a.ticker ? app.prix.get(a.ticker) : null}
-        <div class="prow">
-          <div style="min-width:0">
-            <div class="prow-nom">{a.nom}</div>
-            <div class="prow-meta text-3">
-              {#if !a.ticker}sans ticker · prix par défaut
-              {:else if mp?.ok === false}cours indisponible · prix par défaut
-              {:else if mp?.horodatage}{horodatageRelatif(mp.horodatage)}
-              {:else}—{/if}
+      {#each enveloppesInvest as env (env.id)}
+        <div class="env-label" style="--c:{env.couleur}">{env.nom}</div>
+        {#each lignesBrutes.filter((l) => l.enveloppeId === env.id) as a (a.id)}
+          {@const mp = a.ticker ? app.prix.get(a.ticker) : null}
+          <div class="prow">
+            <div style="min-width:0">
+              <div class="prow-nom">{a.nom}</div>
+              <div class="prow-meta text-3">
+                {#if !a.ticker}sans ticker · prix par défaut
+                {:else if mp?.ok === false}cours indisponible · prix par défaut
+                {:else if mp?.horodatage}{horodatageRelatif(mp.horodatage)}
+                {:else}—{/if}
+              </div>
             </div>
+            <div class="prow-prix">{euros(a.prix)}</div>
           </div>
-          <div class="prow-prix">{euros(a.prix)}</div>
-        </div>
+        {/each}
       {/each}
     </div>
 
-    <!-- Paramètres de calcul -->
-    <div class="card">
-      <div class="eyebrow" style="margin-bottom:12px">Paramètres de calcul</div>
-      <div class="rows">
-        <div class="row">
-          <span class="k">Frais de courtage</span>
-          <div class="cluster"><input class="input mini" type="number" step="0.01" value={fraisPct.toFixed(2)}
-            onchange={(e) => majFrais(e.currentTarget.value)} /><span class="text-3">%</span></div>
-        </div>
-        <div class="row">
-          <span class="k">Ordre minimum</span>
-          <div class="cluster"><input class="input mini" type="number" step="10" value={app.params.ordreMinimum ?? 200}
-            onchange={(e) => majOrdreMin(e.currentTarget.value)} /><span class="text-3">€</span></div>
-        </div>
-      </div>
-    </div>
+    <p class="text-3" style="font-size:12px">Frais et minimum d'achat : appliqués automatiquement depuis les paramètres de chaque enveloppe (Réglages).</p>
 
     <button class="btn btn-primary btn-block btn-lg" onclick={calculer}>Calculer</button>
 
@@ -146,11 +141,13 @@
     {#if resultat}
       <div class="stack">
         {#each resultat.lignes as l (l.id)}
+          {@const brute = ligneParId.get(l.id)}
           <div class="card res" class:zero={l.parts === 0}>
             <div class="between">
               <div>
+                <div class="res-env" style="--c:{brute?.enveloppeCouleur}">{brute?.enveloppeNom}</div>
                 <div class="res-nom">{l.nom}</div>
-                <div class="text-3" style="font-size:12px;margin-top:2px">Cible {Math.round(l.cible * 100)} % · {euros(l.prix)}/part</div>
+                <div class="text-3" style="font-size:12px;margin-top:2px">Cible {pct(l.cibleGlobale, { digits: 1 })} du total · {euros(l.prix)}/part</div>
               </div>
               <div style="text-align:right">
                 <div class="res-parts">{l.parts > 0 ? `${num(l.parts)} parts` : '—'}</div>
@@ -179,13 +176,14 @@
 </div>
 
 <style>
-  .prow { display: flex; align-items: center; gap: 12px; padding: 12px 18px; }
+  .env-label { padding: 10px 18px 2px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c, var(--text-3)); }
+  .prow { display: flex; align-items: center; gap: 12px; padding: 10px 18px; }
   .prow + .prow { border-top: 1px solid var(--line); }
   .prow-nom { font-weight: 600; font-size: 14px; }
   .prow-meta { font-size: 11.5px; margin-top: 2px; }
   .prow-prix { margin-left: auto; padding-left: 12px; font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; }
-  .mini { width: 92px; height: 40px; text-align: right; padding: 0 10px; }
 
+  .res-env { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--c, var(--text-3)); margin-bottom: 2px; }
   .res-nom { font-weight: 600; font-size: 15px; }
   .res-parts { font-weight: 650; font-size: 16px; font-variant-numeric: tabular-nums; }
   .res.zero { opacity: 0.55; }

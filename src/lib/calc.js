@@ -19,6 +19,8 @@ export function fraisCourtagePEA(montant) {
 // montant avec un minimum de 2 € par ordre, + 0,25 % de frais de change si
 // l'actif cote dans une devise étrangère (hors €). Seuils fixes.
 export function fraisCourtageSaxoCTO(montant, deviseEtrangere = false) {
+  // Pas d'ordre, pas de frais : le minimum de 2 € ne s'applique qu'à un achat réel.
+  if (!(montant > 0)) return { frais: 0, courtage: 0, change: 0 };
   const courtage = Math.max(2, montant * 0.0008);
   const change = deviseEtrangere ? montant * 0.0025 : 0;
   return { frais: courtage + change, courtage, change };
@@ -102,70 +104,87 @@ export function patrimoine(enveloppes, transactions, prixMap) {
   };
 }
 
-// ---- Rééquilibrage : algorithme à 2 passages ----
-// actifs : [{ nom, prix, cible (fraction 0..1), valeurActuelle }]
-export function rebalance({ montantDisponible, fraisCourtage = 0.005, ordreMinimum = 200, actifs }) {
-  const facteur = (prix) => prix * (1 + fraisCourtage);
-  const portfolioTotal = actifs.reduce((s, a) => s + (a.valeurActuelle ?? 0), 0);
-  const budgetNet = montantDisponible / (1 + fraisCourtage);
+// Frais d'un ordre sur une ligne donnée, selon le barème réel de son enveloppe
+// (PEA : palier fixe BoursoBank · CTO : barème Saxo + change · Assurance-vie :
+// 0 € · autres : % manuel de l'enveloppe).
+export function fraisCourtageLigne(enveloppe, actif, montant) {
+  if (enveloppe.type === 'PEA') return fraisCourtagePEA(montant).frais;
+  if (enveloppe.type === 'CTO') return fraisCourtageSaxoCTO(montant, actif?.deviseEtrangere).frais;
+  if (enveloppe.type === 'Assurance-vie') return 0;
+  return montant * (Number(enveloppe.fraisPct) || 0) / 100;
+}
 
-  // Manque par actif puis classement par manque décroissant (rang).
-  const avecManque = actifs.map((a) => ({
-    ...a,
-    manque: Math.max(0, (portfolioTotal + budgetNet) * a.cible - (a.valeurActuelle ?? 0))
+// ---- Rééquilibrage global (toutes enveloppes à actifs confondues), 2 passages ----
+// lignes : [{ id, enveloppeId, nom, prix, cibleGlobale (fraction 0..1),
+//             valeurActuelle, minAchat (€, 0 = aucun), frais(montant)->€ }]
+// Les frais ne sont plus un simple %, donc on calcule ligne par ligne combien de
+// parts entières tiennent dans un budget (coût = montant + frais(montant), qui
+// croît avec le nombre de parts pour tous nos barèmes -> recherche dichotomique).
+export function rebalanceGlobal({ montantDisponible, lignes }) {
+  const coutLigne = (l, nParts) => {
+    const montant = nParts * l.prix;
+    return montant + l.frais(montant);
+  };
+  const maxParts = (l, budget) => {
+    if (!(budget > 0) || !(l.prix > 0)) return 0;
+    let lo = 0, hi = Math.floor(budget / l.prix) + 1;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (coutLigne(l, mid) <= budget) lo = mid; else hi = mid - 1;
+    }
+    return lo;
+  };
+
+  const portfolioTotal = lignes.reduce((s, l) => s + (l.valeurActuelle ?? 0), 0);
+
+  // Manque par ligne puis classement par manque décroissant (rang).
+  const avecManque = lignes.map((l) => ({
+    ...l,
+    manque: Math.max(0, (portfolioTotal + montantDisponible) * l.cibleGlobale - (l.valeurActuelle ?? 0))
   }));
   const ordre = [...avecManque].sort((x, y) => y.manque - x.manque);
 
   // Passage 1 — combler les manques.
   const p1 = new Map();
-  let sommeP1 = 0;
-  ordre.forEach((a, i) => {
+  let budgetRestant = montantDisponible;
+  ordre.forEach((l, i) => {
     const rang = i + 1;
-    const budgetRestant = budgetNet - sommeP1;
-    const budgetNormal = Math.min(a.manque, budgetRestant);
-    const partsNormal = Math.floor(budgetNormal / facteur(a.prix));
-    const passeNormal = partsNormal * a.prix >= ordreMinimum;
-
-    let parts;
-    if (passeNormal) {
-      parts = partsNormal;
-    } else if (rang === 1) {
-      // Secours : aucun autre actif acheté encore -> tout le budget restant.
-      const p = Math.floor(budgetRestant / facteur(a.prix));
-      parts = p * a.prix >= ordreMinimum ? p : 0;
-    } else {
-      parts = 0;
+    const cible = Math.min(l.manque, budgetRestant);
+    let nParts = maxParts(l, cible);
+    const passe = nParts * l.prix >= l.minAchat;
+    if (!passe) {
+      if (rang === 1) {
+        // Secours : aucune autre ligne achetée encore -> tout le budget restant.
+        nParts = maxParts(l, budgetRestant);
+        if (nParts * l.prix < l.minAchat) nParts = 0;
+      } else {
+        nParts = 0;
+      }
     }
-    const cout = parts * facteur(a.prix);
-    p1.set(a.id, parts);
-    sommeP1 += cout;
+    p1.set(l.id, nParts);
+    budgetRestant -= coutLigne(l, nParts);
   });
 
-  // Passage 2 — redistribution du budget résiduel.
-  const budgetResiduel = budgetNet - sommeP1;
+  // Passage 2 — redistribution du résiduel au prorata des cibles.
   const p2 = new Map();
-  let sommeP2 = 0;
-  ordre.forEach((a) => {
-    const budgetRestant = budgetResiduel - sommeP2;
-    const alloc = budgetRestant * a.cible;
-    let parts = Math.floor(alloc / facteur(a.prix));
-    if (parts * a.prix < ordreMinimum) parts = 0;
-    p2.set(a.id, parts);
-    sommeP2 += parts * facteur(a.prix);
+  let budgetResiduel = budgetRestant;
+  ordre.forEach((l) => {
+    let nParts = maxParts(l, budgetResiduel * l.cibleGlobale);
+    if (nParts * l.prix < l.minAchat) nParts = 0;
+    p2.set(l.id, nParts);
+    budgetResiduel -= coutLigne(l, nParts);
   });
 
-  // Totaux par actif (dans l'ordre d'origine).
-  const lignes = actifs.map((a) => {
-    const partsP1 = p1.get(a.id) ?? 0;
-    const partsP2 = p2.get(a.id) ?? 0;
-    const parts = partsP1 + partsP2;
-    const cout = parts * facteur(a.prix);
-    return { id: a.id, nom: a.nom, prix: a.prix, cible: a.cible, partsP1, partsP2, parts, cout };
+  // Totaux par ligne (dans l'ordre d'origine).
+  const resultLignes = lignes.map((l) => {
+    const parts = (p1.get(l.id) ?? 0) + (p2.get(l.id) ?? 0);
+    const cout = coutLigne(l, parts);
+    return { id: l.id, enveloppeId: l.enveloppeId, nom: l.nom, prix: l.prix, cibleGlobale: l.cibleGlobale, parts, cout };
   });
 
-  const totalDepense = lignes.reduce((s, l) => s + l.cout, 0);
+  const totalDepense = resultLignes.reduce((s, l) => s + l.cout, 0);
   const resteEspeces = montantDisponible - totalDepense;
-  return { lignes, totalDepense, resteEspeces, budgetNet, portfolioTotal };
+  return { lignes: resultLignes, totalDepense, resteEspeces, portfolioTotal };
 }
 
 // ---- Validation des mois ----
