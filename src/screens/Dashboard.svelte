@@ -101,7 +101,7 @@
 
   <!-- Patrimoine total -->
   <div class="card">
-    <div class="eyebrow">Patrimoine total</div>
+    <div class="eyebrow">Patrimoine total (test MAJ)</div>
     <div class="display" style="margin:6px 0 10px">{euros(valeur, { noCents: true })}</div>
     <div class="cluster" style="gap:14px;flex-wrap:wrap">
       <span class="delta" class:pos={pat.plusValue >= 0} class:neg={pat.plusValue < 0}>
