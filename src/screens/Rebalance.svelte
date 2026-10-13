@@ -108,12 +108,7 @@
     <!-- Prix des parts (automatique), groupés par enveloppe -->
     <div class="card card-flush">
       <div class="between" style="padding:16px 18px 6px">
-        <div>
-          <div class="eyebrow">Prix des parts (auto, HF)</div>
-          {#if app.derniereMajPrix}
-            <div class="text-3" style="font-size:11px;margin-top:2px">Mis à jour {horodatageRelatif(app.derniereMajPrix)}</div>
-          {/if}
-        </div>
+        <div class="eyebrow">Prix des parts (HF)</div>
         <button class="icon-btn" style="border:0;background:transparent;width:auto;height:auto;color:var(--accent);font-weight:600;font-size:13px;gap:6px"
                 onclick={() => app.rafraichirPrix({ force: true })}>
           <Icon name="refresh" size={15} /> {app.refreshingPrices ? '…' : 'Actualiser'}
