@@ -15,6 +15,9 @@ function createAppState() {
   let loaded = $state(false);
   let currentScreen = $state('dashboard');
   let refreshingPrices = $state(false);
+  // Horodatage du dernier rafraîchissement réseau réussi (évite de refetch à
+  // chaque changement d'onglet si les prix sont encore frais).
+  let derniereMajPrix = $state(0);
   // Enveloppe à présélectionner au prochain affichage du Portefeuille (ex. après
   // « Enregistrer ces transactions » depuis le rééquilibrage). Consommé une fois.
   let portefeuilleEnv = $state(null);
@@ -126,10 +129,15 @@ function createAppState() {
     prixHistorique = m;
   }
 
-  // Rafraîchit les prix via réseau pour tous les tickers configurés.
-  async function rafraichirPrix() {
+  // Rafraîchit les prix via réseau pour tous les tickers configurés. Par
+  // défaut, saute l'appel réseau si le dernier rafraîchissement date de moins
+  // de TTL_PRIX_MS (évite de refetch à chaque changement d'onglet) ; { force:
+  // true } (bouton "Actualiser") l'ignore et force un nouvel appel.
+  const TTL_PRIX_MS = 3 * 60 * 1000;
+  async function rafraichirPrix({ force = false } = {}) {
     const tickers = enveloppes.flatMap((e) => (e.actifs ?? []).map((a) => a.ticker)).filter(Boolean);
     if (tickers.length === 0) return;
+    if (!force && Date.now() - derniereMajPrix < TTL_PRIX_MS) return;
     refreshingPrices = true;
     try {
       const res = await refreshPrix(tickers);
@@ -138,6 +146,7 @@ function createAppState() {
         if (v.prix != null) m.set(t, v);
       }
       prix = m;
+      derniereMajPrix = Date.now();
     } finally {
       refreshingPrices = false;
     }
@@ -152,6 +161,7 @@ function createAppState() {
     get prixHebdo() { return prixHebdo; },
     get loaded() { return loaded; },
     get refreshingPrices() { return refreshingPrices; },
+    get derniereMajPrix() { return derniereMajPrix || null; },
     get currentScreen() { return currentScreen; },
     set currentScreen(v) { currentScreen = v; },
     get portefeuilleEnv() { return portefeuilleEnv; },
