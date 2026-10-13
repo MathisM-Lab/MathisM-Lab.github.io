@@ -19,10 +19,15 @@ const YAHOO_HEBDO_DELTA = (ticker, depuisMs) => {
   return `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1wk&period1=${p1}&period2=${p2}`;
 };
 
-// Stratégies de contournement CORS, essayées dans l'ordre.
+// Stratégies de contournement CORS, essayées dans l'ordre. `allorigins` est
+// flaky (erreurs 522 intermittentes côté proxy) mais reste le seul qui
+// fonctionne réellement dans un navigateur -> on le retente avant d'abandonner
+// (corsproxy.io exige désormais une clé API, retiré ; "direct" échoue toujours
+// côté navigateur à cause de CORS, gardé comme dernier recours).
 const PROXIES = [
   {
     name: 'allorigins',
+    tentatives: 2,
     url: (target) => `https://api.allorigins.win/get?url=${encodeURIComponent(target)}`,
     extract: async (res) => {
       const data = await res.json();
@@ -30,16 +35,15 @@ const PROXIES = [
     }
   },
   {
-    name: 'corsproxy',
-    url: (target) => `https://corsproxy.io/?url=${encodeURIComponent(target)}`,
-    extract: async (res) => res.json()
-  },
-  {
     name: 'direct',
     url: (target) => target,
     extract: async (res) => res.json()
   }
 ];
+
+function attendre(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function extractPrice(json) {
   const result = json?.chart?.result?.[0];
@@ -51,23 +55,34 @@ function extractPrice(json) {
   return null;
 }
 
-// Récupère un prix unique. Renvoie { prix, source } ou lève une erreur.
-export async function fetchPrix(ticker) {
-  const target = YAHOO(ticker);
+// Essaie chaque proxy dans l'ordre (avec retries pour les plus flaky comme
+// allorigins), jusqu'à obtenir une réponse exploitable par `valider`. Lève la
+// dernière erreur si tout échoue.
+async function fetchViaProxies(target, valider) {
   let lastErr;
   for (const proxy of PROXIES) {
-    try {
-      const res = await fetch(proxy.url(target), { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await proxy.extract(res);
-      const parsed = extractPrice(json);
-      if (parsed) return { ...parsed, source: proxy.name };
-      throw new Error('Prix introuvable dans la réponse');
-    } catch (e) {
-      lastErr = e;
+    const tentatives = proxy.tentatives ?? 1;
+    for (let essai = 0; essai < tentatives; essai++) {
+      if (essai > 0) await attendre(400);
+      try {
+        const res = await fetch(proxy.url(target), { headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await proxy.extract(res);
+        const result = valider(json);
+        if (result != null) return { result, source: proxy.name };
+        throw new Error('Donnée introuvable dans la réponse');
+      } catch (e) {
+        lastErr = e;
+      }
     }
   }
   throw lastErr ?? new Error('Échec de récupération');
+}
+
+// Récupère un prix unique. Renvoie { prix, source } ou lève une erreur.
+export async function fetchPrix(ticker) {
+  const { result, source } = await fetchViaProxies(YAHOO(ticker), extractPrice);
+  return { ...result, source };
 }
 
 // Construit { 'YYYY-MM': cours } à partir d'une réponse "chart" mensuelle.
@@ -90,21 +105,8 @@ function extractHistorique(json) {
 
 // Historique mensuel d'un ticker -> { 'YYYY-MM': cours }. Lève en cas d'échec.
 export async function fetchHistorique(ticker) {
-  const target = YAHOO_HIST(ticker);
-  let lastErr;
-  for (const proxy of PROXIES) {
-    try {
-      const res = await fetch(proxy.url(target), { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await proxy.extract(res);
-      const points = extractHistorique(json);
-      if (points) return points;
-      throw new Error('Historique introuvable dans la réponse');
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr ?? new Error('Échec de récupération');
+  const { result } = await fetchViaProxies(YAHOO_HIST(ticker), extractHistorique);
+  return result;
 }
 
 // Construit { 'YYYY-MM-DD': cours } à partir d'une réponse chart hebdomadaire.
@@ -127,20 +129,8 @@ function extractHebdo(json) {
 }
 
 async function fetchHebdoBrut(ticker, url) {
-  let lastErr;
-  for (const proxy of PROXIES) {
-    try {
-      const res = await fetch(proxy.url(url), { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await proxy.extract(res);
-      const points = extractHebdo(json);
-      if (points) return points;
-      throw new Error('Données hebdomadaires introuvables');
-    } catch (e) {
-      lastErr = e;
-    }
-  }
-  throw lastErr ?? new Error('Échec de récupération');
+  const { result } = await fetchViaProxies(url, extractHebdo);
+  return result;
 }
 
 const CINQ_ANS_MS = 5 * 365.25 * 24 * 3600 * 1000;
