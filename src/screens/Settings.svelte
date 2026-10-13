@@ -32,7 +32,9 @@
   // --- Notifications push (app fermée) ---
   let pushJson = $state('');
   let pushMsg = $state('');
-  let pushAbonne = $state(false);
+  // null = pas encore vérifié (évite un flash du mauvais libellé le temps que
+  // l'abonnement existant soit détecté de façon asynchrone).
+  let pushAbonne = $state(null);
   onMount(async () => { if (pushSupporte()) pushAbonne = !!(await abonnementActuel()); });
   async function activerNotifsPush() {
     pushMsg = ''; pushJson = '';
@@ -169,7 +171,7 @@
           {/if}
         </p>
       {/if}
-      {#if pushSupporte()}
+      {#if pushSupporte() && pushAbonne !== null}
         <button class="btn btn-secondary btn-block" style="margin-top:10px" onclick={activerNotifsPush}>
           <Icon name="bell" size={16} />
           {pushAbonne ? "Revoir le texte de l'abonnement" : 'Activer les notifications (app fermée)'}
