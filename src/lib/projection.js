@@ -52,6 +52,37 @@ export function partGroupe(enveloppes, enveloppe) {
   return envGroupe.length ? 1 / envGroupe.length : 0;
 }
 
+// Plafond légal de versements cumulés sur un PEA (pas de limite sur la valeur,
+// qui peut dépasser ce montant grâce aux gains : c'est même le principe du PEA).
+export const PLAFOND_VERSEMENT_PEA = 150000;
+
+// Répartit un versement mensuel groupé entre les enveloppes à actifs, en
+// tenant compte du plafond de versement du PEA : une fois `verseCumule` (Map
+// envId -> versements déjà comptés) à 150 000 € pour le PEA, son excédent est
+// redirigé vers les autres enveloppes du groupe (au prorata de leur poids
+// cible entre elles). Ne modifie pas `verseCumule` -> à l'appelant de
+// l'incrémenter avec les montants renvoyés après usage.
+export function repartirGroupe(envGroupe, montantGroupe, verseCumule) {
+  const out = new Map();
+  if (!(montantGroupe > 0) || envGroupe.length === 0) return out;
+  const pea = envGroupe.find((e) => e.type === 'PEA');
+  let restant = montantGroupe;
+  if (pea) {
+    const souhaite = montantGroupe * partGroupe(envGroupe, pea);
+    const dispo = Math.max(0, PLAFOND_VERSEMENT_PEA - (verseCumule.get(pea.id) ?? 0));
+    const alloue = Math.min(souhaite, dispo);
+    out.set(pea.id, alloue);
+    restant -= alloue;
+  }
+  const autres = envGroupe.filter((e) => e !== pea);
+  const sommePoids = autres.reduce((s, e) => s + (Number(e.poidsCible) || 0), 0);
+  for (const e of autres) {
+    const part = sommePoids > 0 ? (Number(e.poidsCible) || 0) / sommePoids : (autres.length ? 1 / autres.length : 0);
+    out.set(e.id, restant * part);
+  }
+  return out;
+}
+
 // Taux mensuel d'une enveloppe. Pour les enveloppes à actifs, c'est la moyenne
 // des rendements par actif pondérée par les cibles (un fonds euros à 2 % et un
 // ETF à 6 % ne se moyennent pas à la main). Repli : rendement d'enveloppe s'il
@@ -99,6 +130,10 @@ export function genererProjection({
   maxMois = 365
 } = {}) {
   const paliersGroupeAbs = paliersDe({ paliers: paliersGroupe }, dateDebut);
+  const envGroupe = enveloppes.filter((e) => aDesActifs(e.type));
+  // Versements cumulés déjà "projetés" vers chaque enveloppe du groupe (pour
+  // appliquer le plafond PEA au fil des mois, cf. repartirGroupe).
+  const verseCumule = new Map(envGroupe.map((e) => [e.id, 0]));
 
   // Prépare l'état de chaque enveloppe. Les enveloppes à actifs n'ont plus
   // leur propre palier -> elles reçoivent une part du palier groupé.
@@ -106,7 +141,6 @@ export function genererProjection({
     id: e.id,
     nom: e.nom,
     paliers: aDesActifs(e.type) ? null : paliersDe(e, dateDebut),
-    part: partGroupe(enveloppes, e),
     taux: tauxMensuelEnv(e, { rendementMensuel, rendementLivretMensuel }),
     valeur: 0
   }));
@@ -119,12 +153,16 @@ export function genererProjection({
 
   const serie = [];
   for (let mois = 0; mois <= maxMois; mois++) {
+    const mvtGroupe = mvtAuMois(paliersGroupeAbs, mois);
+    const allocGroupe = repartirGroupe(envGroupe, mvtGroupe, verseCumule);
+
     const parEnv = {};
     let total = 0;
-    const mvtGroupe = mvtAuMois(paliersGroupeAbs, mois);
     for (const s of etats) {
       if (mois > 0) s.valeur *= (1 + s.taux);
-      s.valeur += s.paliers ? mvtAuMois(s.paliers, mois) : mvtGroupe * s.part;
+      const mvt = s.paliers ? mvtAuMois(s.paliers, mois) : (allocGroupe.get(s.id) ?? 0);
+      s.valeur += mvt;
+      if (allocGroupe.has(s.id)) verseCumule.set(s.id, (verseCumule.get(s.id) ?? 0) + mvt);
       parEnv[s.id] = s.valeur;
       total += s.valeur;
     }

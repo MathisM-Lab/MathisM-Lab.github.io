@@ -3,7 +3,7 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct, eurosCompact } from '../lib/format.js';
   import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
-  import { mvtPrevuAuMois, tauxMensuelEnv, partGroupe } from '../lib/projection.js';
+  import { mvtPrevuAuMois, tauxMensuelEnv, repartirGroupe } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
   import { aDesActifs } from '../lib/defaults.js';
   import { saveEnveloppe, getEnveloppe, setParam, getParam } from '../lib/db.js';
@@ -172,6 +172,14 @@
     return total;
   }
 
+  // Versements cumulés (hors frais) sur une enveloppe au mois m — pour suivre
+  // le plafond de versement du PEA dans la projection "réelle".
+  function verseEnvAuMois(env, m) {
+    return app.transactions
+      .filter((t) => t.enveloppe === env.id && (t.mois ?? 0) <= m)
+      .reduce((s, t) => s + (t.montantHorsFrais ?? t.montant ?? 0), 0);
+  }
+
   // Vues par enveloppe (envId null = total)
   let vues = $derived.by(() => {
     const base = [{ key: 'total', label: 'Total', envId: null }];
@@ -243,29 +251,35 @@
 
   // Projection "réelle" : part de la valeur actuelle réelle (par enveloppe) et applique
   // la stratégie prévue (paliers + rendements) à partir d'aujourd'hui vers l'avenir.
+  // Le palier groupé se répartit en tenant compte du plafond de versement du
+  // PEA (repartirGroupe), amorcé avec ses versements réels déjà effectués.
   let pointsProjectionReelle = $derived.by(() => {
     if (!aUnPlan) return [];
     const envsFiltrees = vue.envId == null
       ? app.enveloppes
       : app.enveloppes.filter((e) => e.id === vue.envId);
-    // La part de chaque enveloppe dans le palier groupé se calcule sur
-    // TOUTES les enveloppes à actifs (pas juste celles filtrées par la vue),
-    // pour garder les bonnes proportions même en vue "une seule enveloppe".
+    // Calculé sur TOUTES les enveloppes à actifs (pas juste celles filtrées
+    // par la vue), pour garder les bonnes proportions/plafond même en vue
+    // "une seule enveloppe".
+    const envGroupe = app.enveloppes.filter((e) => aDesActifs(e.type));
+    const verseCumule = new Map(envGroupe.map((e) => [e.id, verseEnvAuMois(e, mc)]));
     const etats = envsFiltrees.map((e) => ({
       e,
       valeur: valeurEnvAuMois(e, mc),
-      taux: tauxMensuelEnv(e, { rendementMensuel: app.params.rendementMensuel ?? 0.0056 }),
-      part: partGroupe(app.enveloppes, e)
+      taux: tauxMensuelEnv(e, { rendementMensuel: app.params.rendementMensuel ?? 0.0056 })
     }));
     const paliersGroupe = app.params.paliersInvest ?? [];
     const points = [];
     for (let m = mc; m <= horizon; m++) {
       if (m > mc) {
+        const mvtGroupe = mvtPrevuAuMois({ paliers: paliersGroupe }, m, app.params.dateDebut);
+        const allocGroupe = repartirGroupe(envGroupe, mvtGroupe, verseCumule);
         for (const s of etats) {
           const mvt = aDesActifs(s.e.type)
-            ? mvtPrevuAuMois({ paliers: paliersGroupe }, m, app.params.dateDebut) * s.part
+            ? (allocGroupe.get(s.e.id) ?? 0)
             : mvtPrevuAuMois(s.e, m, app.params.dateDebut);
           s.valeur = s.valeur * (1 + s.taux) + mvt;
+          if (allocGroupe.has(s.e.id)) verseCumule.set(s.e.id, (verseCumule.get(s.e.id) ?? 0) + mvt);
         }
       }
       points.push({ x: m, y: etats.reduce((sum, s) => sum + s.valeur, 0) });
