@@ -2,12 +2,11 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct } from '../lib/format.js';
   import { moisToLabel } from '../lib/date.js';
-  import { projeteAuMois, aUneProjection, mvtPrevuAuMois } from '../lib/projection.js';
+  import { mvtPrevuAuMois } from '../lib/projection.js';
   import { moisEstValide, enveloppesInvestiesAuMois } from '../lib/calc.js';
   import { ASSET_PALETTE } from '../lib/defaults.js';
   import { srriColor } from '../lib/srri.js';
   import DonutChart from '../components/DonutChart.svelte';
-  import Gauge from '../components/Gauge.svelte';
   import Calendar from '../components/Calendar.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -15,13 +14,8 @@
 
   let pat = $derived(app.patrimoine);
   let mc = $derived(app.moisCourant);
-  let serie = $derived(app.projection);
 
   let valeur = $derived(pat.valeurActuelle);
-  let aUnPlan = $derived(aUneProjection(serie));
-  let projeteMaintenant = $derived(projeteAuMois(serie, mc));
-  let ecart = $derived(valeur - projeteMaintenant);
-  let ecartPct = $derived(projeteMaintenant > 0 ? ecart / projeteMaintenant : 0);
 
   let investiCeMois = $derived(
     app.transactions.filter((t) => (t.mois ?? null) === mc).reduce((s, t) => s + (t.montant ?? 0), 0)
@@ -124,23 +118,6 @@
       {/if}
     </div>
   </div>
-
-  <!-- Projection vs Réalité (uniquement si un plan est défini) -->
-  {#if aUnPlan}
-    <div class="card">
-      <div class="between" style="margin-bottom:12px">
-        <div class="eyebrow">Projection vs réalité</div>
-        <span class="delta" class:pos={ecart >= 0} class:neg={ecart < 0} style="font-size:13px">
-          {signedEuros(ecart)} · {pct(ecartPct, { signed: true })}
-        </span>
-      </div>
-      <Gauge value={valeur} max={Math.max(valeur, projeteMaintenant) * 1.15 || 1} marker={projeteMaintenant} />
-      <div class="between" style="margin-top:8px;font-size:12px">
-        <span class="text-3">Réalité {euros(valeur, { noCents: true })}</span>
-        <span class="text-3">Plan {euros(projeteMaintenant, { noCents: true })}</span>
-      </div>
-    </div>
-  {/if}
 
   <!-- Répartition -->
   <div class="card">

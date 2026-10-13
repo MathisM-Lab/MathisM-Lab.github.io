@@ -3,7 +3,7 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct, eurosCompact } from '../lib/format.js';
   import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
-  import { projeteAuMois, mvtPrevuAuMois, tauxMensuelEnv } from '../lib/projection.js';
+  import { mvtPrevuAuMois, tauxMensuelEnv } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
   import { saveEnveloppe, getEnveloppe } from '../lib/db.js';
   import LineChart from '../components/LineChart.svelte';
@@ -254,29 +254,10 @@
     return out;
   });
 
-  // Indicateurs
-  let projeteMaintenant = $derived(projeteAuMois(serie, mc));
-  let ecart = $derived(pat.valeurActuelle - projeteMaintenant);
 </script>
 
 <div class="screen">
   <div class="screen-head"><h1>Évolution</h1></div>
-
-  <!-- Indicateurs clés -->
-  <div class="kpis">
-    <div class="kpi">
-      <div class="eyebrow">Réel</div>
-      <div class="kpi-v">{euros(pat.valeurActuelle, { noCents: true })}</div>
-    </div>
-    <div class="kpi">
-      <div class="eyebrow">Projeté</div>
-      <div class="kpi-v">{euros(projeteMaintenant, { noCents: true })}</div>
-    </div>
-    <div class="kpi">
-      <div class="eyebrow">Écart</div>
-      <div class="kpi-v" class:pos={ecart >= 0} class:neg={ecart < 0}>{signedEuros(ecart, { noCents: true })}</div>
-    </div>
-  </div>
 
   <!-- Graphique -->
   <div class="card">
@@ -358,9 +339,6 @@
 </div>
 
 <style>
-  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-  .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-md); padding: 14px 12px; }
-  .kpi-v { font-size: 17px; font-weight: 650; font-variant-numeric: tabular-nums; margin-top: 6px; letter-spacing: -0.02em; }
 
   .chip {
     flex-shrink: 0; padding: 8px 14px; border-radius: var(--r-pill);
