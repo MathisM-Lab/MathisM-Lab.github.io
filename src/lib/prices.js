@@ -20,10 +20,10 @@ const YAHOO_HEBDO_DELTA = (ticker, depuisMs) => {
 };
 
 // Stratégies de contournement CORS, essayées dans l'ordre. `allorigins` est
-// flaky (erreurs 522 intermittentes côté proxy) mais reste le seul qui
-// fonctionne réellement dans un navigateur -> on le retente avant d'abandonner
-// (corsproxy.io exige désormais une clé API, retiré ; "direct" échoue toujours
-// côté navigateur à cause de CORS, gardé comme dernier recours).
+// le seul qui fonctionne réellement dans un navigateur (corsproxy.io exige
+// désormais une clé API ; un appel direct est toujours bloqué par CORS côté
+// navigateur, inutile de le tenter -> pas de 2e entrée ici). Il est flaky
+// (erreurs 522 intermittentes côté proxy), d'où le retry avant d'abandonner.
 const PROXIES = [
   {
     name: 'allorigins',
@@ -33,11 +33,6 @@ const PROXIES = [
       const data = await res.json();
       return JSON.parse(data.contents);
     }
-  },
-  {
-    name: 'direct',
-    url: (target) => target,
-    extract: async (res) => res.json()
   }
 ];
 
