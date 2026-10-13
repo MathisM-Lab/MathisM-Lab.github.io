@@ -19,12 +19,16 @@ const YAHOO_HEBDO_DELTA = (ticker, depuisMs) => {
   return `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1wk&period1=${p1}&period2=${p2}`;
 };
 
-// Stratégies de contournement CORS, essayées dans l'ordre. `allorigins` est
-// le seul qui fonctionne réellement dans un navigateur (corsproxy.io exige
-// désormais une clé API ; un appel direct est toujours bloqué par CORS côté
-// navigateur, inutile de le tenter -> pas de 2e entrée ici). Il est flaky
-// (erreurs 522 intermittentes côté proxy), d'où le retry avant d'abandonner.
+// Stratégies de contournement CORS, essayées dans l'ordre. `cloudflare-worker`
+// est notre propre proxy (fiable, pas de dépendance à un service tiers
+// gratuit) -> prioritaire. `allorigins` reste en secours (flaky, erreurs 522
+// intermittentes côté proxy, d'où le retry avant d'abandonner).
 const PROXIES = [
+  {
+    name: 'cloudflare-worker',
+    url: (target) => `https://prix-proxy.mat2003mathis.workers.dev/?url=${encodeURIComponent(target)}`,
+    extract: async (res) => res.json()
+  },
   {
     name: 'allorigins',
     tentatives: 2,
