@@ -151,7 +151,6 @@
     return mois ? `${a} ${mois} mois` : a;
   }
 
-  let serie = $derived(app.projection);
   let mc = $derived(app.moisCourant);
   let pat = $derived(app.patrimoine);
 
@@ -190,13 +189,6 @@
   });
   let vueKey = $state('total');
   let vue = $derived(vues.find((v) => v.key === vueKey) ?? vues[0]);
-
-  // Argent réellement versé (cumul net des montants, ventes incluses).
-  function verseCumuleAuMois(m, vueDef) {
-    return app.transactions
-      .filter((t) => (t.mois ?? 0) <= m && (vueDef.envId == null || t.enveloppe === vueDef.envId))
-      .reduce((s, t) => s + (t.montant ?? 0), 0);
-  }
 
   // Cours d'un actif au mois m : prix live pour le mois courant, sinon historique
   // mensuel (avec report du dernier cours connu), sinon prix par défaut saisi.
@@ -242,12 +234,8 @@
     return total;
   }
 
-  function projAuMois(m, vueDef) {
-    if (!serie[m]) return 0;
-    return vueDef.envId == null ? serie[m].totalProjete : (serie[m].parEnv?.[vueDef.envId] ?? 0);
-  }
-
-  let aUnPlan = $derived(serie.length > 0 && serie[serie.length - 1].totalProjete > 0);
+  // Y a-t-il un plan défini (au moins un palier, individuel ou groupé) ?
+  let aUnPlan = $derived(ciblesPlan.some((c) => c.paliers.some((p) => Number(p.montant) > 0)));
 
   // Projection "réelle" : part de la valeur actuelle réelle (par enveloppe) et applique
   // la stratégie prévue (paliers + rendements) à partir d'aujourd'hui vers l'avenir.
@@ -288,18 +276,11 @@
   });
 
   let series = $derived.by(() => {
-    const proj = [], verse = [], valeur = [];
-    for (let m = 0; m <= horizon; m++) {
-      proj.push({ x: m, y: projAuMois(m, vue) });
-      if (m <= mc) {
-        verse.push({ x: m, y: verseCumuleAuMois(m, vue) });
-        valeur.push({ x: m, y: valeurReelleAuMois(m, vue) });
-      }
+    const valeur = [];
+    for (let m = 0; m <= mc; m++) {
+      valeur.push({ x: m, y: valeurReelleAuMois(m, vue) });
     }
-    const out = [];
-    if (aUnPlan) out.push({ name: 'Plan initial', color: 'var(--text-3)', dashed: true, points: proj });
-    out.push({ name: 'Versé', color: '#9B7DFF', points: verse });
-    out.push({ name: 'Valeur', color: 'var(--accent)', points: valeur });
+    const out = [{ name: 'Valeur', color: 'var(--accent)', points: valeur }];
     if (aUnPlan) out.push({ name: 'Projection', color: '#52C974', points: pointsProjectionReelle });
     return out;
   });

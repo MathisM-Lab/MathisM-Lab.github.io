@@ -1,4 +1,4 @@
-// Génère la série de projection "plan" mois 0 → maxMois.
+// Paliers de versement mensuel et répartition entre enveloppes.
 //
 // Modèle simple et transparent, entièrement saisi par l'utilisateur. Une suite
 // de "paliers" de versement : { depuis: 'YYYY-MM', montant }. Un palier
@@ -8,14 +8,10 @@
 // propre palier individuel. Les enveloppes à actifs (PEA, CTO, Assurance-vie,
 // Crypto…) partagent un seul palier groupé (c'est le Rééquilibrage qui décide
 // de la vraie répartition d'un versement entre elles) : chacune en reçoit une
-// part au prorata de son poids cible, cf. partGroupe(). À chaque mois on
-// compose la valeur de chaque enveloppe (rendement mensuel pour les
-// enveloppes d'investissement, taux livret pour les autres) puis on ajoute le
-// versement prévu de ce mois-là. Le modèle part de 0 : sans palier défini, la
-// courbe "plan" reste à 0.
+// part au prorata de son poids cible, cf. partGroupe()/repartirGroupe().
 
 import { aDesActifs } from './defaults.js';
-import { ageAuMois, monthInputToMois } from './date.js';
+import { monthInputToMois } from './date.js';
 
 const TAUX_LIVRET_MENSUEL = 0.002; // ~2,4 %/an pour les enveloppes type Livret
 
@@ -120,70 +116,3 @@ export function tauxMensuelEnv(e, {
   return rendementLivretMensuel;
 }
 
-export function genererProjection({
-  enveloppes = [],
-  paliersGroupe = [],
-  rendementMensuel = 0.0056,
-  rendementLivretMensuel = TAUX_LIVRET_MENSUEL,
-  dateNaissance = null,
-  dateDebut = undefined,
-  maxMois = 365
-} = {}) {
-  const paliersGroupeAbs = paliersDe({ paliers: paliersGroupe }, dateDebut);
-  const envGroupe = enveloppes.filter((e) => aDesActifs(e.type));
-  // Versements cumulés déjà "projetés" vers chaque enveloppe du groupe (pour
-  // appliquer le plafond PEA au fil des mois, cf. repartirGroupe).
-  const verseCumule = new Map(envGroupe.map((e) => [e.id, 0]));
-
-  // Prépare l'état de chaque enveloppe. Les enveloppes à actifs n'ont plus
-  // leur propre palier -> elles reçoivent une part du palier groupé.
-  const etats = enveloppes.map((e) => ({
-    id: e.id,
-    nom: e.nom,
-    paliers: aDesActifs(e.type) ? null : paliersDe(e, dateDebut),
-    taux: tauxMensuelEnv(e, { rendementMensuel, rendementLivretMensuel }),
-    valeur: 0
-  }));
-
-  const mvtAuMois = (paliers, mois) => {
-    let montant = 0;
-    for (const p of paliers) { if (p.mois <= mois) montant = p.montant; else break; }
-    return montant;
-  };
-
-  const serie = [];
-  for (let mois = 0; mois <= maxMois; mois++) {
-    const mvtGroupe = mvtAuMois(paliersGroupeAbs, mois);
-    const allocGroupe = repartirGroupe(envGroupe, mvtGroupe, verseCumule);
-
-    const parEnv = {};
-    let total = 0;
-    for (const s of etats) {
-      if (mois > 0) s.valeur *= (1 + s.taux);
-      const mvt = s.paliers ? mvtAuMois(s.paliers, mois) : (allocGroupe.get(s.id) ?? 0);
-      s.valeur += mvt;
-      if (allocGroupe.has(s.id)) verseCumule.set(s.id, (verseCumule.get(s.id) ?? 0) + mvt);
-      parEnv[s.id] = s.valeur;
-      total += s.valeur;
-    }
-    serie.push({
-      mois,
-      age: ageAuMois(mois, dateNaissance, dateDebut),
-      parEnv,
-      totalProjete: total
-    });
-  }
-  return serie;
-}
-
-// Valeur projetée (totale) pour un mois donné.
-export function projeteAuMois(serie, mois) {
-  if (!serie?.length) return 0;
-  const clamp = Math.max(0, Math.min(mois, serie.length - 1));
-  return serie[clamp]?.totalProjete ?? 0;
-}
-
-// Y a-t-il une projection définie (au moins un versement prévu) ?
-export function aUneProjection(serie) {
-  return !!serie?.length && serie[serie.length - 1].totalProjete > 0;
-}

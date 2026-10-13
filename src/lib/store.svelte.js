@@ -1,6 +1,5 @@
 import { getAllParams, getEnveloppes, getTransactions, getDB, deleteTransaction, setPrixHistorique, getAllPrixHebdo, setPrixHebdo } from './db.js';
 import { refreshPrix, refreshHistorique, refreshHebdo } from './prices.js';
-import { genererProjection } from './projection.js';
 import { moisCourant as calcMoisCourant } from './date.js';
 import { patrimoine, moisEstValide } from './calc.js';
 import { calculerSRRI } from './srri.js';
@@ -170,16 +169,6 @@ function createAppState() {
     // Dérivés
     get moisCourant() { return calcMoisCourant(params.dateDebut); },
     get patrimoine() { return patrimoine(enveloppes, transactions, prix); },
-    get projection() {
-      return genererProjection({
-        enveloppes,
-        paliersGroupe: params.paliersInvest ?? [],
-        rendementMensuel: params.rendementMensuel ?? 0.0056,
-        dateNaissance: params.dateNaissance,
-        dateDebut: params.dateDebut,
-        maxMois: 480
-      });
-    },
     get moisCourantValide() {
       return moisEstValide(enveloppes, transactions, calcMoisCourant(params.dateDebut), params.dateDebut, params.paliersInvest ?? []);
     },
