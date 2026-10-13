@@ -402,7 +402,7 @@
   .palier-mois { flex: 1; height: 40px; padding: 0 10px; min-width: 0; font-size: 12px; }
   .palier-montant { width: 53px; height: 40px; text-align: right; padding: 0 10px; flex-shrink: 0; font-size: 12px; }
   .palier-del { width: 34px; height: 34px; border: 0; background: transparent; color: var(--text-3); flex-shrink: 0; }
-  .palier-actuel { background: var(--warn-soft); border: 1px solid rgba(240,169,43,0.35); border-radius: var(--r-md); padding: 6px 8px; margin: -6px -8px 8px; }
+  .palier-actuel { background: var(--warn-soft); border: 1px solid rgba(240,169,43,0.35); border-radius: var(--r-md); padding: 6px 8px; margin: 0 -8px 8px; }
   .palier-actuel .palier-lbl { color: var(--warn); font-weight: 600; }
   .palier-mois-fixe { flex: 1; font-size: 12px; font-weight: 600; }
   .palier-montant-fixe { font-size: 12px; font-weight: 700; color: var(--warn); padding-right: 42px; }
