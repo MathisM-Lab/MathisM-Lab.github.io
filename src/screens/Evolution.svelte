@@ -18,6 +18,30 @@
   function paliersEnv(e) {
     return Array.isArray(e.paliers) ? e.paliers : [];
   }
+
+  // Liste affichée = paliers réels + un repère "mois en cours" non éditable,
+  // inséré à sa place chronologique (montant hérité du palier actif, cf.
+  // mvtPrevuAuMois). Si un vrai palier tombe déjà pile ce mois-ci, pas de
+  // doublon : on le marque juste comme actuel à sa place.
+  function paliersAffichage(e) {
+    const reels = paliersEnv(e);
+    const moisActuelInput = moisToMonthInput(mc, app.params.dateDebut);
+    if (reels.some((p) => p.depuis === moisActuelInput)) {
+      return reels.map((p) => ({ ...p, actuel: p.depuis === moisActuelInput, synthetique: false }));
+    }
+    const repere = {
+      id: `actuel-${e.id}`,
+      depuis: moisActuelInput,
+      montant: mvtPrevuAuMois(e, mc, app.params.dateDebut),
+      actuel: true,
+      synthetique: true
+    };
+    const out = reels.map((p) => ({ ...p, actuel: false, synthetique: false }));
+    let idx = out.findIndex((p) => p.depuis > moisActuelInput);
+    if (idx === -1) idx = out.length;
+    out.splice(idx, 0, repere);
+    return out;
+  }
   // Les saisies de paliers déclenchent des écritures asynchrones (save + reload).
   // Sans précaution, deux handlers qui se chevauchent (ex. blur d'un champ +
   // clic corbeille, ou deux montants édités d'affilée) liraient tous les deux la
@@ -282,17 +306,25 @@
       {#each app.enveloppes as e (e.id)}
         <div class="plan-env">
           <div class="plan-env-head"><span class="dot" style="background:{e.couleur}"></span>{e.nom}</div>
-          {#each paliersEnv(e) as p (p.id)}
-            <div class="palier">
-              <span class="text-3 palier-lbl">dès</span>
-              <input class="input palier-mois" type="month" value={p.depuis}
-                     onchange={(ev) => majPalier(e, p.id, 'depuis', ev.currentTarget.value)} />
-              <input class="input palier-montant" type="number" step="10" min="0" value={p.montant}
-                     onchange={(ev) => majPalier(e, p.id, 'montant', ev.currentTarget.value)} /><span class="text-3">€</span>
-              <button class="icon-btn palier-del" onclick={() => demanderSuppressionPalier(e, p.id)} aria-label="Retirer le palier">
-                <Icon name="trash" size={15} />
-              </button>
-            </div>
+          {#each paliersAffichage(e) as p (p.id)}
+            {#if p.synthetique}
+              <div class="palier palier-actuel">
+                <span class="text-3 palier-lbl">mois en cours</span>
+                <span class="palier-mois-fixe">{moisToLabelCourt(mc, app.params.dateDebut)}</span>
+                <span class="palier-montant-fixe">{euros(p.montant, { noCents: true })}</span>
+              </div>
+            {:else}
+              <div class="palier" class:palier-actuel={p.actuel}>
+                <span class="text-3 palier-lbl">{p.actuel ? 'mois en cours' : 'dès'}</span>
+                <input class="input palier-mois" type="month" value={p.depuis}
+                       onchange={(ev) => majPalier(e, p.id, 'depuis', ev.currentTarget.value)} />
+                <input class="input palier-montant" type="number" step="10" min="0" value={p.montant}
+                       onchange={(ev) => majPalier(e, p.id, 'montant', ev.currentTarget.value)} /><span class="text-3">€</span>
+                <button class="icon-btn palier-del" onclick={() => demanderSuppressionPalier(e, p.id)} aria-label="Retirer le palier">
+                  <Icon name="trash" size={15} />
+                </button>
+              </div>
+            {/if}
           {/each}
           {#if paliersEnv(e).length === 0}
             <p class="text-3" style="font-size:12px;margin:0 0 8px">Aucun versement prévu.</p>
@@ -370,6 +402,10 @@
   .palier-mois { flex: 1; height: 40px; padding: 0 10px; min-width: 0; font-size: 12px; }
   .palier-montant { width: 53px; height: 40px; text-align: right; padding: 0 10px; flex-shrink: 0; font-size: 12px; }
   .palier-del { width: 34px; height: 34px; border: 0; background: transparent; color: var(--text-3); flex-shrink: 0; }
+  .palier-actuel { background: var(--warn-soft); border: 1px solid rgba(240,169,43,0.35); border-radius: var(--r-md); padding: 6px 8px; margin: -6px -8px 8px; }
+  .palier-actuel .palier-lbl { color: var(--warn); font-weight: 600; }
+  .palier-mois-fixe { flex: 1; font-size: 12px; font-weight: 600; }
+  .palier-montant-fixe { font-size: 12px; font-weight: 700; color: var(--warn); padding-right: 42px; }
   .palier-add {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 7px 12px; border-radius: var(--r-pill);
