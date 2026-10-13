@@ -36,10 +36,13 @@
   onMount(async () => { if (pushSupporte()) pushAbonne = !!(await abonnementActuel()); });
   async function activerNotifsPush() {
     pushMsg = ''; pushJson = '';
+    const existait = pushAbonne;
     try {
       pushJson = await activerPush();
       pushAbonne = true;
-      pushMsg = 'Abonnement créé. Copie le texte ci-dessous dans le secret GitHub PUSH_SUBSCRIPTION.';
+      pushMsg = existait
+        ? 'Abonnement existant. Copie le texte ci-dessous dans le secret GitHub PUSH_SUBSCRIPTION si ce n\'est pas déjà fait (ex. après un changement de téléphone).'
+        : 'Abonnement créé. Copie le texte ci-dessous dans le secret GitHub PUSH_SUBSCRIPTION.';
     } catch (e) {
       pushMsg = e?.message ?? String(e);
     }
@@ -166,9 +169,10 @@
           {/if}
         </p>
       {/if}
-      {#if pushSupporte() && !pushAbonne}
+      {#if pushSupporte()}
         <button class="btn btn-secondary btn-block" style="margin-top:10px" onclick={activerNotifsPush}>
-          <Icon name="bell" size={16} /> Activer les notifications (app fermée)
+          <Icon name="bell" size={16} />
+          {pushAbonne ? "Revoir le texte de l'abonnement" : 'Activer les notifications (app fermée)'}
         </button>
       {/if}
       {#if pushJson}
