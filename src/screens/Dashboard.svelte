@@ -4,7 +4,7 @@
   import { moisToLabel } from '../lib/date.js';
   import { mvtPrevuAuMois } from '../lib/projection.js';
   import { moisEstValide, enveloppesInvestiesAuMois } from '../lib/calc.js';
-  import { ASSET_PALETTE } from '../lib/defaults.js';
+  import { ASSET_PALETTE, aDesActifs } from '../lib/defaults.js';
   import { srriColor } from '../lib/srri.js';
   import DonutChart from '../components/DonutChart.svelte';
   import Calendar from '../components/Calendar.svelte';
@@ -21,15 +21,27 @@
     app.transactions.filter((t) => (t.mois ?? null) === mc).reduce((s, t) => s + (t.montant ?? 0), 0)
   );
 
-  let valide = $derived(moisEstValide(app.enveloppes, app.transactions, mc, app.params.dateDebut));
-  let planCeMois = $derived(
-    app.enveloppes
+  let valide = $derived(moisEstValide(app.enveloppes, app.transactions, mc, app.params.dateDebut, app.params.paliersInvest ?? []));
+  // Livret A etc. (palier individuel) listés séparément ; les enveloppes à
+  // actifs (PEA, CTO, Assurance-vie, Crypto…) partagent un palier groupé
+  // (c'est le Rééquilibrage qui décide de la vraie répartition).
+  let planCeMois = $derived.by(() => {
+    const out = app.enveloppes
+      .filter((e) => !aDesActifs(e.type))
       .map((e) => ({ nom: e.nom, couleur: e.couleur, montant: mvtPrevuAuMois(e, mc, app.params.dateDebut) }))
-      .filter((e) => e.montant > 0)
-  );
+      .filter((e) => e.montant > 0);
+    const envGroupe = app.enveloppes.filter((e) => aDesActifs(e.type));
+    if (envGroupe.length) {
+      const montant = mvtPrevuAuMois({ paliers: app.params.paliersInvest ?? [] }, mc, app.params.dateDebut);
+      if (montant > 0) out.push({ nom: envGroupe.map((e) => e.nom).join(', '), couleur: envGroupe[0].couleur, montant });
+    }
+    return out;
+  });
   let globalSRRI = $derived(app.srri.global);
   let manquantes = $derived(
-    enveloppesInvestiesAuMois(app.enveloppes, app.transactions, mc, app.params.dateDebut).filter((x) => !x.investie).map((x) => x.enveloppe.nom)
+    enveloppesInvestiesAuMois(app.enveloppes, app.transactions, mc, app.params.dateDebut, app.params.paliersInvest ?? [])
+      .filter((x) => !x.investie)
+      .map((x) => x.enveloppe ? x.enveloppe.nom : x.groupe.map((e) => e.nom).join(', '))
   );
 
   // Camembert
@@ -61,7 +73,7 @@
   function statusOf(m) {
     if (m > mc) return 'futur';
     if (m === mc) return valide ? 'valide' : 'encours';
-    return moisEstValide(app.enveloppes, app.transactions, m, app.params.dateDebut) ? 'valide' : 'manque';
+    return moisEstValide(app.enveloppes, app.transactions, m, app.params.dateDebut, app.params.paliersInvest ?? []) ? 'valide' : 'manque';
   }
 
   function ouvrirMois() { app.currentScreen = 'portefeuille'; }

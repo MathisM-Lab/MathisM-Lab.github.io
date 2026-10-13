@@ -3,9 +3,10 @@
   import { app } from '../lib/store.svelte.js';
   import { euros, signedEuros, pct, eurosCompact } from '../lib/format.js';
   import { moisToLabelCourt, dateDebutToMonthInput, moisToMonthInput, monthInputToMois } from '../lib/date.js';
-  import { mvtPrevuAuMois, tauxMensuelEnv } from '../lib/projection.js';
+  import { mvtPrevuAuMois, tauxMensuelEnv, partGroupe } from '../lib/projection.js';
   import { estLivret } from '../lib/calc.js';
-  import { saveEnveloppe, getEnveloppe } from '../lib/db.js';
+  import { aDesActifs } from '../lib/defaults.js';
+  import { saveEnveloppe, getEnveloppe, setParam, getParam } from '../lib/db.js';
   import LineChart from '../components/LineChart.svelte';
   import Icon from '../components/Icon.svelte';
   import Sheet from '../components/Sheet.svelte';
@@ -14,25 +15,44 @@
   // Au démarrage de l'écran : télécharge l'historique mensuel des prix en arrière-plan.
   onMount(() => { app.rafraichirHistorique(); });
 
-  // Plan d'épargne : paliers de versement par enveloppe { depuis: 'YYYY-MM', montant }.
-  function paliersEnv(e) {
-    return Array.isArray(e.paliers) ? e.paliers : [];
+  // Plan d'épargne : paliers de versement { depuis: 'YYYY-MM', montant }.
+  // Le Livret A (et autres enveloppes sans actifs) garde son propre palier
+  // individuel. Les enveloppes à actifs (PEA, CTO, Assurance-vie, Crypto…)
+  // partagent un seul palier groupé (app.params.paliersInvest) : c'est le
+  // Rééquilibrage qui décide de la vraie répartition d'un versement entre
+  // elles, donc un montant par enveloppe ici n'aurait aucun sens.
+  function cibleEnveloppe(e) {
+    return { type: 'env', id: e.id, nom: e.nom, couleurs: [e.couleur], paliers: Array.isArray(e.paliers) ? e.paliers : [] };
   }
+  function cibleGroupe(envGroupe) {
+    return {
+      type: 'groupe',
+      id: 'groupe',
+      nom: envGroupe.map((e) => e.nom).join(', '),
+      couleurs: envGroupe.map((e) => e.couleur),
+      paliers: app.params.paliersInvest ?? []
+    };
+  }
+  let ciblesPlan = $derived.by(() => {
+    const indiv = app.enveloppes.filter((e) => !aDesActifs(e.type)).map(cibleEnveloppe);
+    const envGroupe = app.enveloppes.filter((e) => aDesActifs(e.type));
+    return envGroupe.length ? [...indiv, cibleGroupe(envGroupe)] : indiv;
+  });
 
   // Liste affichée = paliers réels + un repère "mois en cours" non éditable,
   // inséré à sa place chronologique (montant hérité du palier actif, cf.
   // mvtPrevuAuMois). Si un vrai palier tombe déjà pile ce mois-ci, pas de
   // doublon : on le marque juste comme actuel à sa place.
-  function paliersAffichage(e) {
-    const reels = paliersEnv(e);
+  function paliersAffichage(cible) {
+    const reels = cible.paliers;
     const moisActuelInput = moisToMonthInput(mc, app.params.dateDebut);
     if (reels.some((p) => p.depuis === moisActuelInput)) {
       return reels.map((p) => ({ ...p, actuel: p.depuis === moisActuelInput, synthetique: false }));
     }
     const repere = {
-      id: `actuel-${e.id}`,
+      id: `actuel-${cible.id}`,
       depuis: moisActuelInput,
-      montant: mvtPrevuAuMois(e, mc, app.params.dateDebut),
+      montant: mvtPrevuAuMois({ paliers: reels }, mc, app.params.dateDebut),
       actuel: true,
       synthetique: true
     };
@@ -50,21 +70,28 @@
   // Parade : on sérialise les opérations dans une file, et chaque opération relit
   // l'état FRAIS de la base juste avant d'écrire.
   let fileEcriture = Promise.resolve();
-  function mutatePaliers(envId, transformer) {
+  function mutatePaliers(cible, transformer) {
     fileEcriture = fileEcriture.then(async () => {
-      const fresh = await getEnveloppe(envId);
-      if (!fresh) return;
-      let paliers = (Array.isArray(fresh.paliers) ? fresh.paliers : []).map((p) => ({ ...p }));
-      paliers = transformer(paliers);
-      // Tri chronologique pour l'affichage (l'each est indexé par `id` stable).
-      paliers.sort((a, b) => (a.depuis < b.depuis ? -1 : a.depuis > b.depuis ? 1 : 0));
-      await saveEnveloppe({ ...fresh, paliers });
+      if (cible.type === 'groupe') {
+        const fresh = await getParam('paliersInvest');
+        let paliers = (Array.isArray(fresh) ? fresh : []).map((p) => ({ ...p }));
+        paliers = transformer(paliers);
+        paliers.sort((a, b) => (a.depuis < b.depuis ? -1 : a.depuis > b.depuis ? 1 : 0));
+        await setParam('paliersInvest', paliers);
+      } else {
+        const fresh = await getEnveloppe(cible.id);
+        if (!fresh) return;
+        let paliers = (Array.isArray(fresh.paliers) ? fresh.paliers : []).map((p) => ({ ...p }));
+        paliers = transformer(paliers);
+        paliers.sort((a, b) => (a.depuis < b.depuis ? -1 : a.depuis > b.depuis ? 1 : 0));
+        await saveEnveloppe({ ...fresh, paliers });
+      }
       await app.reload();
     });
     return fileEcriture;
   }
-  function ajouterPalier(env) {
-    return mutatePaliers(env.id, (paliers) => {
+  function ajouterPalier(cible) {
+    return mutatePaliers(cible, (paliers) => {
       // Nouveau palier au mois suivant le dernier (donc en bas, chronologiquement).
       let depuis = dateDebutToMonthInput(app.params.dateDebut);
       if (paliers.length) {
@@ -75,35 +102,36 @@
       return paliers;
     });
   }
-  function majPalier(env, id, champ, valeur) {
-    return mutatePaliers(env.id, (paliers) => {
-      const cible = paliers.find((p) => p.id === id);
-      if (!cible) return paliers;
-      if (champ === 'montant') cible.montant = Number(String(valeur).replace(',', '.')) || 0;
-      else cible.depuis = valeur;
+  function majPalier(cible, id, champ, valeur) {
+    return mutatePaliers(cible, (paliers) => {
+      const p = paliers.find((x) => x.id === id);
+      if (!p) return paliers;
+      if (champ === 'montant') p.montant = Number(String(valeur).replace(',', '.')) || 0;
+      else p.depuis = valeur;
       return paliers;
     });
   }
-  function retirerPalier(env, id) {
-    return mutatePaliers(env.id, (paliers) => paliers.filter((p) => p.id !== id));
+  function retirerPalier(cible, id) {
+    return mutatePaliers(cible, (paliers) => paliers.filter((p) => p.id !== id));
   }
 
   // Confirmation de suppression de palier : recopie d'un code (ConfirmRecopie).
-  let suppPalier = $state(null); // { env, id } | null
+  let suppPalier = $state(null); // { cible, id } | null
 
-  function demanderSuppressionPalier(env, id) {
-    suppPalier = { env, id };
+  function demanderSuppressionPalier(cible, id) {
+    suppPalier = { cible, id };
   }
 
   async function confirmerSuppressionPalier() {
     if (!suppPalier) return;
-    const { env, id } = suppPalier;
+    const { cible, id } = suppPalier;
     suppPalier = null;
-    await retirerPalier(env, id);
+    await retirerPalier(cible, id);
   }
-  // Versement réellement prévu ce mois-ci (somme des paliers actifs), pour info.
+  // Versement réellement prévu ce mois-ci (paliers individuels + palier groupé), pour info.
   let totalMvtCourant = $derived(
-    app.enveloppes.reduce((s, e) => s + mvtPrevuAuMois(e, app.moisCourant, app.params.dateDebut), 0)
+    app.enveloppes.filter((e) => !aDesActifs(e.type)).reduce((s, e) => s + mvtPrevuAuMois(e, app.moisCourant, app.params.dateDebut), 0)
+    + mvtPrevuAuMois({ paliers: app.params.paliersInvest ?? [] }, app.moisCourant, app.params.dateDebut)
   );
 
   // Horizon du graphique : curseur libre de 3 mois à 40 ans (480 mois).
@@ -220,16 +248,24 @@
     const envsFiltrees = vue.envId == null
       ? app.enveloppes
       : app.enveloppes.filter((e) => e.id === vue.envId);
+    // La part de chaque enveloppe dans le palier groupé se calcule sur
+    // TOUTES les enveloppes à actifs (pas juste celles filtrées par la vue),
+    // pour garder les bonnes proportions même en vue "une seule enveloppe".
     const etats = envsFiltrees.map((e) => ({
       e,
       valeur: valeurEnvAuMois(e, mc),
-      taux: tauxMensuelEnv(e, { rendementMensuel: app.params.rendementMensuel ?? 0.0056 })
+      taux: tauxMensuelEnv(e, { rendementMensuel: app.params.rendementMensuel ?? 0.0056 }),
+      part: partGroupe(app.enveloppes, e)
     }));
+    const paliersGroupe = app.params.paliersInvest ?? [];
     const points = [];
     for (let m = mc; m <= horizon; m++) {
       if (m > mc) {
         for (const s of etats) {
-          s.valeur = s.valeur * (1 + s.taux) + mvtPrevuAuMois(s.e, m, app.params.dateDebut);
+          const mvt = aDesActifs(s.e.type)
+            ? mvtPrevuAuMois({ paliers: paliersGroupe }, m, app.params.dateDebut) * s.part
+            : mvtPrevuAuMois(s.e, m, app.params.dateDebut);
+          s.valeur = s.valeur * (1 + s.taux) + mvt;
         }
       }
       points.push({ x: m, y: etats.reduce((sum, s) => sum + s.valeur, 0) });
@@ -284,10 +320,16 @@
   <div class="card">
     <div class="eyebrow" style="margin-bottom:12px">Mon plan — versements mensuels</div>
     {#if app.enveloppes.length}
-      {#each app.enveloppes as e (e.id)}
+      {#each ciblesPlan as cible (cible.id)}
         <div class="plan-env">
-          <div class="plan-env-head"><span class="dot" style="background:{e.couleur}"></span>{e.nom}</div>
-          {#each paliersAffichage(e) as p (p.id)}
+          <div class="plan-env-head">
+            {#each cible.couleurs as c}<span class="dot" style="background:{c}"></span>{/each}
+            {cible.nom}
+          </div>
+          {#if cible.type === 'groupe'}
+            <p class="text-3" style="font-size:11.5px;margin:-4px 0 10px">Réparti automatiquement entre ces enveloppes par le Rééquilibrage.</p>
+          {/if}
+          {#each paliersAffichage(cible) as p (p.id)}
             {#if p.synthetique}
               <div class="palier palier-actuel">
                 <span class="text-3 palier-lbl">mois en cours</span>
@@ -298,19 +340,19 @@
               <div class="palier" class:palier-actuel={p.actuel}>
                 <span class="text-3 palier-lbl">{p.actuel ? 'mois en cours' : 'dès'}</span>
                 <input class="input palier-mois" type="month" value={p.depuis}
-                       onchange={(ev) => majPalier(e, p.id, 'depuis', ev.currentTarget.value)} />
+                       onchange={(ev) => majPalier(cible, p.id, 'depuis', ev.currentTarget.value)} />
                 <input class="input palier-montant" type="number" step="10" min="0" value={p.montant}
-                       onchange={(ev) => majPalier(e, p.id, 'montant', ev.currentTarget.value)} /><span class="text-3">€</span>
-                <button class="icon-btn palier-del" onclick={() => demanderSuppressionPalier(e, p.id)} aria-label="Retirer le palier">
+                       onchange={(ev) => majPalier(cible, p.id, 'montant', ev.currentTarget.value)} /><span class="text-3">€</span>
+                <button class="icon-btn palier-del" onclick={() => demanderSuppressionPalier(cible, p.id)} aria-label="Retirer le palier">
                   <Icon name="trash" size={15} />
                 </button>
               </div>
             {/if}
           {/each}
-          {#if paliersEnv(e).length === 0}
+          {#if cible.paliers.length === 0}
             <p class="text-3" style="font-size:12px;margin:0 0 8px">Aucun versement prévu.</p>
           {/if}
-          <button class="palier-add" onclick={() => ajouterPalier(e)}>
+          <button class="palier-add" onclick={() => ajouterPalier(cible)}>
             <Icon name="plus" size={15} /> Ajouter un palier
           </button>
         </div>

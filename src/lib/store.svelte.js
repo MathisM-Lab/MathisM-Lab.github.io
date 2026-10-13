@@ -173,6 +173,7 @@ function createAppState() {
     get projection() {
       return genererProjection({
         enveloppes,
+        paliersGroupe: params.paliersInvest ?? [],
         rendementMensuel: params.rendementMensuel ?? 0.0056,
         dateNaissance: params.dateNaissance,
         dateDebut: params.dateDebut,
@@ -180,7 +181,7 @@ function createAppState() {
       });
     },
     get moisCourantValide() {
-      return moisEstValide(enveloppes, transactions, calcMoisCourant(params.dateDebut), params.dateDebut);
+      return moisEstValide(enveloppes, transactions, calcMoisCourant(params.dateDebut), params.dateDebut, params.paliersInvest ?? []);
     },
     get srri() {
       return calculerSRRI(enveloppes, prix, transactions, prixHebdo);

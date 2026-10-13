@@ -60,6 +60,12 @@ export async function setParam(cle, valeur) {
   await db.put('parametres', { cle, valeur });
 }
 
+export async function getParam(cle) {
+  const db = await getDB();
+  const row = await db.get('parametres', cle);
+  return row?.valeur;
+}
+
 export async function getAllParams() {
   const db = await getDB();
   const rows = await db.getAll('parametres');

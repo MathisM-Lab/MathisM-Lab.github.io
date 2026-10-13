@@ -8,7 +8,8 @@ export const DEFAULT_PARAMS = {
   onboardingDone: false,
   nomUtilisateur: 'Mathis',
   dateNaissance: '2003-10-02',
-  dateDebut: '2026-04-01'   // remplacé par le mois courant à la fin de l'onboarding
+  dateDebut: '2026-04-01',  // remplacé par le mois courant à la fin de l'onboarding
+  paliersInvest: []          // palier groupé des enveloppes à actifs (PEA, CTO, AV, Crypto…)
 };
 
 export const DEFAULT_ENVELOPPES = [

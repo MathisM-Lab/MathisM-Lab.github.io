@@ -2,7 +2,7 @@
 // `prixOf(actif)` renvoie le prix unitaire courant d'un actif.
 
 import { mvtPrevuAuMois } from './projection.js';
-import { MIN_ACHAT_DEFAUT } from './defaults.js';
+import { MIN_ACHAT_DEFAUT, aDesActifs } from './defaults.js';
 
 export function estLivret(enveloppe) {
   return enveloppe.type === 'Livret A' || !enveloppe.actifs || enveloppe.actifs.length === 0;
@@ -199,19 +199,30 @@ export function rebalanceGlobal({ montantDisponible, lignes }) {
 // ---- Validation des mois ----
 // Une enveloppe n'est "attendue" un mois donné que si le plan prévoit un
 // versement ce mois-là (palier actif > 0). Les enveloppes sans versement prévu
-// (ex. une assurance-vie alimentée ponctuellement) ne comptent pas.
-export function enveloppesInvestiesAuMois(enveloppes, transactions, mois, dateDebut) {
+// (ex. une assurance-vie alimentée ponctuellement) ne comptent pas. Le Livret
+// A (et autres enveloppes sans actifs) a son propre palier individuel. Les
+// enveloppes à actifs (PEA, CTO, Assurance-vie, Crypto…) partagent un seul
+// palier groupé (`paliersGroupe`, cf. projection.js) : le mois compte comme
+// investi pour le groupe dès qu'AU MOINS UNE d'entre elles a une transaction
+// ce mois-là (c'est le Rééquilibrage qui décide laquelle).
+export function enveloppesInvestiesAuMois(enveloppes, transactions, mois, dateDebut, paliersGroupe = []) {
   const ids = new Set(
     transactions.filter((t) => (t.mois ?? null) === mois).map((t) => t.enveloppe)
   );
-  return enveloppes
-    .filter((e) => mvtPrevuAuMois(e, mois, dateDebut) > 0)
+  const out = enveloppes
+    .filter((e) => !aDesActifs(e.type) && mvtPrevuAuMois(e, mois, dateDebut) > 0)
     .map((e) => ({ enveloppe: e, investie: ids.has(e.id) }));
+  const envGroupe = enveloppes.filter((e) => aDesActifs(e.type));
+  if (envGroupe.length && mvtPrevuAuMois({ paliers: paliersGroupe }, mois, dateDebut) > 0) {
+    out.push({ enveloppe: null, groupe: envGroupe, investie: envGroupe.some((e) => ids.has(e.id)) });
+  }
+  return out;
 }
 
-// Un mois est "validé" si chaque enveloppe *attendue* ce mois-là a une transaction.
-// Un mois sans aucun versement prévu est considéré comme validé (rien à faire).
-export function moisEstValide(enveloppes, transactions, mois, dateDebut) {
+// Un mois est "validé" si chaque enveloppe (et le groupe) *attendu* ce mois-là
+// a une transaction. Un mois sans aucun versement prévu est considéré comme
+// validé (rien à faire).
+export function moisEstValide(enveloppes, transactions, mois, dateDebut, paliersGroupe = []) {
   if (!enveloppes.length) return false;
-  return enveloppesInvestiesAuMois(enveloppes, transactions, mois, dateDebut).every((x) => x.investie);
+  return enveloppesInvestiesAuMois(enveloppes, transactions, mois, dateDebut, paliersGroupe).every((x) => x.investie);
 }
